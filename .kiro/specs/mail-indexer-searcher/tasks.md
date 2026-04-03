@@ -69,8 +69,8 @@ The implementation follows this sequence:
     - Test message ID retrieval
     - _Requirements: 1.3, 1.5, 8.1_
 
-- [ ] 5. Implement email indexing service
-  - [ ] 5.1 Create EmailIndexingService interface and implementation
+- [x] 5. Implement email indexing service
+  - [x] 5.1 Create EmailIndexingService interface and implementation
     - Implement isEmailIndexed method to check for existing records
     - Implement extractEmailData method to parse IMAP message into EmailData DTO
     - Extract sender, recipients, subject, date, body (text and HTML), and attachment metadata
@@ -78,15 +78,15 @@ The implementation follows this sequence:
     - Implement indexEmail method to create Email record with transaction
     - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.9, 6.5_
   
-  - [ ]* 5.2 Write property test for email data extraction
+  - [x]* 5.2 Write property test for email data extraction
     - **Property 3: Email Data Extraction Completeness**
     - **Validates: Requirements 3.2, 3.3, 3.4, 3.5, 6.5**
   
-  - [ ]* 5.3 Write property test for indexing idempotence
+  - [x]* 5.3 Write property test for indexing idempotence
     - **Property 4: Indexing Idempotence**
     - **Validates: Requirements 3.9**
   
-  - [ ]* 5.4 Write unit tests for indexing service
+  - [x]* 5.4 Write unit tests for indexing service
     - Test extraction with various email formats (plain text, HTML, multipart)
     - Test attachment metadata extraction
     - Test error handling for malformed emails
