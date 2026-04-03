@@ -7,13 +7,13 @@ return [
 
     'prefix' => env('SCOUT_PREFIX', ''),
 
-    'queue' => env('SCOUT_QUEUE', false),
+    'queue' => env('SCOUT_QUEUE', true),
 
     'after_commit' => env('SCOUT_AFTER_COMMIT', true),
 
     'chunk' => [
-        'searchable' => 500,
-        'unsearchable' => 500,
+        'searchable' => (int) env('SCOUT_CHUNK_SEARCHABLE', 500),
+        'unsearchable' => (int) env('SCOUT_CHUNK_UNSEARCHABLE', 500),
     ],
 
     'soft_delete' => false,
