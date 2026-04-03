@@ -206,6 +206,47 @@ test('is email indexed checks for an existing stored message', function () {
         ->and($service->isEmailIndexed($user, '<missing@example.com>'))->toBeFalse();
 });
 
+test('index email clears failure markers for an existing failed record', function () {
+    $user = User::factory()->create();
+    $connection = makeFakeImapConnection();
+
+    $email = Email::create([
+        'user_id' => $user->id,
+        'message_id' => '<retry@example.com>',
+        'folder' => 'INBOX',
+        'from_address' => 'sender@example.com',
+        'to_addresses' => [],
+        'cc_addresses' => [],
+        'subject' => 'Retry me',
+        'date' => now(),
+        'attachments' => [],
+        'indexing_failed_at' => now(),
+        'indexing_error' => 'Temporary outage',
+    ]);
+
+    $service = new DatabaseEmailIndexingService(fakeImapServiceReturning(new EmailData(
+        messageId: '<retry@example.com>',
+        fromAddress: 'sender@example.com',
+        fromName: null,
+        toAddresses: [],
+        ccAddresses: [],
+        subject: 'Retry me',
+        date: now(),
+        bodyText: 'Recovered body',
+        bodyHtml: null,
+        attachments: [],
+    )));
+
+    $result = $service->indexEmail($user, '<retry@example.com>', 'INBOX', $connection);
+
+    expect($result->is($email))->toBeTrue();
+
+    $email->refresh();
+
+    expect($email->indexing_failed_at)->toBeNull()
+        ->and($email->indexing_error)->toBeNull();
+});
+
 test('extract email data wraps malformed email errors in an indexing exception', function () {
     $service = new DatabaseEmailIndexingService(new class implements ImapConnectionService
     {

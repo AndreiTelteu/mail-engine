@@ -273,16 +273,16 @@ The implementation follows this sequence:
     - Configure Scout to use batch indexing when available
     - _Requirements: 7.4_
 
-- [ ] 16. Add artisan commands for maintenance
-  - [ ] 16.1 Create command to retry failed indexing
+- [x] 16. Add artisan commands for maintenance
+  - [x] 16.1 Create command to retry failed indexing
     - Create artisan command to requeue emails with indexing_failed_at set
     - _Requirements: 8.3_
   
-  - [ ] 16.2 Create command to clean up inconsistencies
+  - [x] 16.2 Create command to clean up inconsistencies
     - Create artisan command to identify and fix orphaned records
     - _Requirements: Error Handling - Data Consistency_
 
-- [ ] 17. Checkpoint - Ensure all tests pass
+- [x] 17. Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
 - [ ]* 18. Write integration tests

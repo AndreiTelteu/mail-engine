@@ -28,6 +28,13 @@ class DatabaseEmailIndexingService implements EmailIndexingService
             ->first();
 
         if ($existing !== null) {
+            if ($existing->indexing_failed_at !== null) {
+                $existing->forceFill([
+                    'indexing_failed_at' => null,
+                    'indexing_error' => null,
+                ])->save();
+            }
+
             return $existing;
         }
 
