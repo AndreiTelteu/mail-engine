@@ -42,18 +42,18 @@ The implementation follows this sequence:
     - Test JSON field casting
     - _Requirements: 3.6, 3.7_
 
-- [ ] 3. Create data transfer objects
-  - [ ] 3.1 Create EmailData DTO
+- [x] 3. Create data transfer objects
+  - [x] 3.1 Create EmailData DTO
     - Define class with constructor for message ID, addresses, subject, date, body content, and attachment metadata
     - _Requirements: 3.2, 3.3, 3.4_
   
-  - [ ] 3.2 Create ImapConnection DTO
+  - [x] 3.2 Create ImapConnection DTO
     - Define class with IMAP resource and settings
     - Add disconnect method
     - _Requirements: 2.3_
 
-- [ ] 4. Implement IMAP connection service
-  - [ ] 4.1 Create ImapConnectionService interface and implementation
+- [x] 4. Implement IMAP connection service
+  - [x] 4.1 Create ImapConnectionService interface and implementation
     - Implement testConnection method with timeout and error handling
     - Implement connect method using ImapSetting model
     - Implement getFolders method to retrieve all IMAP folders
@@ -62,7 +62,7 @@ The implementation follows this sequence:
     - Use webklex/php-imap package or PHP IMAP extension
     - _Requirements: 1.3, 2.3, 2.4, 3.1, 9.1_
   
-  - [ ]* 4.2 Write unit tests for IMAP connection service
+  - [x]* 4.2 Write unit tests for IMAP connection service
     - Test connection with valid credentials using mock IMAP server
     - Test connection failure scenarios (timeout, auth failure, SSL errors)
     - Test folder retrieval
