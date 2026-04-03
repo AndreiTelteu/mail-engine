@@ -248,13 +248,13 @@ The implementation follows this sequence:
     - Create route for email detail page (new tab view) with auth middleware
     - _Requirements: 4.1, 5.7, 6.3_
 
-- [ ] 14. Configure Typesense and Scout
-  - [ ] 14.1 Set up Typesense schema
+- [x] 14. Configure Typesense and Scout
+  - [x] 14.1 Set up Typesense schema
     - Create artisan command to initialize Typesense collection with schema from design
     - Configure Scout in config/scout.php
     - _Requirements: 3.7, 4.2_
   
-  - [ ] 14.2 Configure Scout model settings
+  - [x] 14.2 Configure Scout model settings
     - Ensure Email model searchableAs returns 'emails'
     - Verify toSearchableArray includes user_id for filtering
     - _Requirements: 3.7, 4.3, 6.2_

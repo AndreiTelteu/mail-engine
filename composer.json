@@ -16,6 +16,7 @@
         "laravel/tinker": "^3.0",
         "livewire/flux": "^2.12.0",
         "livewire/livewire": "^4.1",
+        "typesense/typesense-php": "^4.9",
         "webklex/php-imap": "^6.2"
     },
     "require-dev": {
@@ -41,6 +42,11 @@
         }
     },
     "scripts": {
+        "index": [
+            "Composer\\Config::disableProcessTimeout",
+            "php artisan mail:typesense:init --fresh",
+            "php artisan scout:import 'App\\Models\\Email'"
+        ],
         "setup": [
             "composer install",
             "@php -r \"file_exists('.env') || copy('.env.example', '.env');\"",

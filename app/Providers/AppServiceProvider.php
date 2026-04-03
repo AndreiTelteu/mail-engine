@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
+use Typesense\Client as TypesenseClient;
 use Webklex\PHPIMAP\ClientManager;
 
 class AppServiceProvider extends ServiceProvider
@@ -23,6 +24,7 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->singleton(ClientManager::class, fn (): ClientManager => new ClientManager([]));
+        $this->app->singleton(TypesenseClient::class, fn (): TypesenseClient => new TypesenseClient(config('scout.typesense.client-settings', [])));
         $this->app->singleton(ImapConnectionService::class, WebklexImapConnectionService::class);
         $this->app->singleton(EmailIndexingService::class, DatabaseEmailIndexingService::class);
         $this->app->singleton(EmailSearchService::class, ScoutEmailSearchService::class);
