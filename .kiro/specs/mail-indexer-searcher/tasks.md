@@ -320,7 +320,7 @@ The implementation follows this sequence:
     - IMAP connection fails → error displayed → user corrects → retry succeeds
     - _Requirements: 1.5, 8.1_
 
-- [ ] 20. Final checkpoint - Ensure all tests pass
+- [x] 20. Final checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
 ## Notes
