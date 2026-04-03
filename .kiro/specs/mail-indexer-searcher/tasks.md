@@ -92,11 +92,11 @@ The implementation follows this sequence:
     - Test error handling for malformed emails
     - _Requirements: 3.2, 3.3, 3.4, 3.10_
 
-- [ ] 6. Checkpoint - Ensure all tests pass
+- [x] 6. Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 7. Implement background jobs
-  - [ ] 7.1 Create SyncEmailsJob
+- [x] 7. Implement background jobs
+  - [x] 7.1 Create SyncEmailsJob
     - Implement handle method to iterate through users with active IMAP settings
     - For each user, connect to IMAP and retrieve folders
     - For each folder, identify unindexed emails by comparing IMAP message IDs with database
@@ -104,18 +104,18 @@ The implementation follows this sequence:
     - Add error handling to continue processing other users on failure
     - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 8.1, 9.1_
   
-  - [ ]* 7.2 Write property test for unindexed email identification
+  - [x]* 7.2 Write property test for unindexed email identification
     - **Property 2: Unindexed Email Identification**
     - **Validates: Requirements 2.5**
   
-  - [ ] 7.3 Create IndexEmailJob with retry logic
+  - [x] 7.3 Create IndexEmailJob with retry logic
     - Implement handle method to retrieve email from IMAP and index using EmailIndexingService
     - Configure 3 retries with exponential backoff (60s, 120s, 240s)
     - Implement failed method to mark email with indexing_failed_at and indexing_error
     - Use database transaction to ensure MySQL and Typesense consistency
     - _Requirements: 3.1, 3.6, 3.7, 8.2, 8.3, 8.5_
   
-  - [ ]* 7.4 Write unit tests for jobs
+  - [x]* 7.4 Write unit tests for jobs
     - Test SyncEmailsJob user iteration and job queuing
     - Test IndexEmailJob retry logic and failure handling
     - Test error handling for IMAP connection failures
