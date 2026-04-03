@@ -11,6 +11,8 @@ use Livewire\Component;
 
 class EmailModalComponent extends Component
 {
+    public bool $standalone = false;
+
     public ?int $emailId = null;
 
     public ?Email $email = null;
@@ -21,6 +23,7 @@ class EmailModalComponent extends Component
 
     public function mount(?int $emailId = null): void
     {
+        $this->standalone = request()->routeIs('emails.show');
         $this->emailId = $emailId;
 
         if ($emailId !== null) {
@@ -41,6 +44,13 @@ class EmailModalComponent extends Component
     public function close(): void
     {
         $this->show = false;
+
+        if ($this->standalone) {
+            $this->redirect(route('emails.index', absolute: false), navigate: true);
+
+            return;
+        }
+
         $this->dispatch('close-email-modal');
     }
 
@@ -50,7 +60,7 @@ class EmailModalComponent extends Component
             return;
         }
 
-        $this->dispatch('open-email-in-new-tab', url: url("/emails/{$this->email->id}"));
+        $this->dispatch('open-email-in-new-tab', url: route('emails.show', ['emailId' => $this->email->id]));
     }
 
     public function sanitizeHtml(?string $html): string
@@ -115,6 +125,9 @@ class EmailModalComponent extends Component
 
     public function render()
     {
-        return view('livewire.email-modal-component');
+        return view('livewire.email-modal-component')
+            ->layout('layouts.app', [
+                'title' => __('Email detail'),
+            ]);
     }
 }

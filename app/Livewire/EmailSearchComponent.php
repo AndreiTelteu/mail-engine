@@ -72,6 +72,8 @@ class EmailSearchComponent extends Component
             'folders' => $folders,
             'formattedResults' => $formattedResults,
             'results' => $results,
+        ])->layout('layouts.app', [
+            'title' => __('Mail search'),
         ]);
     }
 }

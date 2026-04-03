@@ -116,6 +116,9 @@ class ImapSettingsComponent extends Component
 
     public function render()
     {
-        return view('livewire.imap-settings-component');
+        return view('livewire.imap-settings-component')
+            ->layout('layouts.app', [
+                'title' => __('Mail settings'),
+            ]);
     }
 }

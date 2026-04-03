@@ -238,12 +238,12 @@ The implementation follows this sequence:
     - Add close button and open in new tab button
     - _Requirements: 5.1, 5.2, 5.4, 5.5, 5.6, 5.7, 5.8, 9.4, 10.3_
 
-- [ ] 13. Configure routes and authentication
-  - [ ] 13.1 Add routes for IMAP settings page
+- [x] 13. Configure routes and authentication
+  - [x] 13.1 Add routes for IMAP settings page
     - Create route for settings page with auth middleware
     - _Requirements: 1.1, 6.3_
   
-  - [ ] 13.2 Add routes for email search page
+  - [x] 13.2 Add routes for email search page
     - Create route for search page with auth middleware
     - Create route for email detail page (new tab view) with auth middleware
     - _Requirements: 4.1, 5.7, 6.3_

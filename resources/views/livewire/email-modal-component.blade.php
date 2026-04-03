@@ -22,10 +22,19 @@
                 ->implode(', ');
         @endphp
 
-        <div class="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/60 p-4 backdrop-blur-sm">
-            <div class="absolute inset-0" wire:click="close"></div>
+        <div @class([
+            'fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/60 p-4 backdrop-blur-sm' => ! $standalone,
+            'mx-auto w-full max-w-6xl p-4 sm:p-6' => $standalone,
+        ])>
+            @unless ($standalone)
+                <div class="absolute inset-0" wire:click="close"></div>
+            @endunless
 
-            <article class="relative z-10 flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-3xl border border-zinc-200 bg-white shadow-2xl dark:border-zinc-800 dark:bg-zinc-900">
+            <article @class([
+                'relative z-10 flex w-full flex-col overflow-hidden border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900',
+                'max-h-[90vh] max-w-4xl rounded-3xl shadow-2xl' => ! $standalone,
+                'min-h-[70vh] rounded-3xl shadow-sm' => $standalone,
+            ])>
                 <div class="flex items-start justify-between gap-4 border-b border-zinc-200 px-6 py-5 dark:border-zinc-800">
                     <div class="space-y-2">
                         <div class="flex flex-wrap items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
@@ -96,6 +105,13 @@
                     </aside>
                 </div>
             </article>
+        </div>
+    @elseif ($standalone)
+        <div class="mx-auto max-w-3xl p-6">
+            <div class="rounded-3xl border border-zinc-200 bg-white p-8 text-center dark:border-zinc-800 dark:bg-zinc-900">
+                <flux:heading size="lg">{{ __('Email not found') }}</flux:heading>
+                <flux:text class="mt-2">{{ __('This email could not be loaded or you do not have access to it.') }}</flux:text>
+            </div>
         </div>
     @endif
 </section>
