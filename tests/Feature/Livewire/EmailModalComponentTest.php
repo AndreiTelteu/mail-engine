@@ -31,7 +31,7 @@ function createModalEmail(User $user, array $overrides = []): Email
     ], $overrides)));
 }
 
-test('email modal opens and displays sanitized content', function () {
+test('email modal opens and renders the email inside a sandboxed iframe', function () {
     $user = User::factory()->create();
     $email = createModalEmail($user);
 
@@ -40,12 +40,15 @@ test('email modal opens and displays sanitized content', function () {
     Livewire::test(EmailModalComponent::class)
         ->call('open', $email->id)
         ->assertSet('show', true)
+        ->assertSet('iframeDocument', fn (string $document): bool => str_contains($document, '<script>alert(1)</script>')
+            && str_contains($document, 'javascript:alert(2)'))
         ->assertSee('Modal email')
         ->assertSee('sender@example.com')
         ->assertSee('2 attachments')
         ->assertSee('report.pdf')
-        ->assertDontSee('script')
-        ->assertDontSee('javascript:');
+        ->assertSeeHtml('sandbox="allow-popups allow-popups-to-escape-sandbox allow-same-origin"')
+        ->assertSeeHtml('referrerpolicy="no-referrer"')
+        ->assertSeeHtml('srcdoc="');
 });
 
 test('email modal hides the attachments section when the message has no attachments', function () {
@@ -96,27 +99,20 @@ test('open in new tab dispatches an event', function () {
         ->assertDispatched('open-email-in-new-tab');
 });
 
-test('html sanitization removes dangerous payloads while preserving safe markup', function () {
+test('plain text emails are wrapped into an iframe document', function () {
     $component = app(EmailModalComponent::class);
+    $reflection = new ReflectionMethod($component, 'buildIframeDocument');
+    $reflection->setAccessible(true);
 
-    $payloads = [
-        '<div onclick="alert(1)">Hello</div>',
-        '<script>alert(1)</script><p>Safe</p>',
-        '<a href="javascript:alert(1)">Click</a>',
-        '<img src="x" onerror="alert(1)"><span>Image</span>',
-        '<iframe src="https://example.com"></iframe><strong>Keep me</strong>',
-    ];
+    $email = createModalEmail(User::factory()->create(), [
+        'body_html' => null,
+        'body_text' => "Line one\nLine two",
+    ]);
 
-    foreach ($payloads as $payload) {
-        $sanitized = $component->sanitizeHtml($payload);
+    $document = $reflection->invoke($component, $email);
 
-        expect($sanitized)->not->toContain('onclick');
-        expect($sanitized)->not->toContain('onerror');
-        expect($sanitized)->not->toContain('javascript:');
-        expect($sanitized)->not->toContain('<script');
-        expect($sanitized)->not->toContain('<iframe');
-    }
-
-    expect($component->sanitizeHtml('<p><strong>Safe</strong> body</p>'))
-        ->toContain('<strong>Safe</strong>');
+    expect($document)
+        ->toContain('<pre style=')
+        ->toContain('Line one')
+        ->toContain('Line two');
 });

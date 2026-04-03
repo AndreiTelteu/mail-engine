@@ -55,7 +55,7 @@ test('imap integration connects to a mock server and retrieves folders and email
 
     expect($folders)->toBe(['INBOX', 'Sent'])
         ->and($messageIds)->toBe(['<invoice@example.com>'])
-        ->and($email->subject)->toBe('Quarterly invoice')
+        ->and($email->subject)->toBe('ideaprint.ro – 8 curieri, fără abonament')
         ->and($email->fromAddress)->toBe('billing@example.com')
         ->and($email->toAddresses)->toBe([['address' => 'integration@example.com', 'name' => 'Integration User']])
         ->and($email->attachments)->toBe([['filename' => 'invoice.pdf', 'filetype' => 'application/pdf']]);
@@ -103,7 +103,7 @@ function integrationImapFolders(): array
 
                 public function getSubject(): string
                 {
-                    return 'Quarterly invoice';
+                    return 'ideaprint.ro =?UTF-8?B?4oCTIDggY3VyaWVyaSwgZsSDcsSD?= abonament';
                 }
 
                 public function getDate(): CarbonImmutable

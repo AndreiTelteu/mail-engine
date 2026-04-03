@@ -112,7 +112,7 @@ class WebklexImapConnectionService implements ImapConnectionService
                         fromName: $this->firstAddress($message->getFrom())['name'] ?? null,
                         toAddresses: $this->normalizeAddresses($message->getTo()),
                         ccAddresses: $this->normalizeAddresses($message->getCc()),
-                        subject: $this->stringValue($message->getSubject()) ?? '',
+                        subject: $this->decodeMimeHeader($this->stringValue($message->getSubject())) ?? '',
                         date: $this->normalizeDate($message->getDate()),
                         bodyText: $this->nullableString($message->getTextBody()),
                         bodyHtml: $this->nullableString($message->getHTMLBody()),
@@ -216,7 +216,7 @@ class WebklexImapConnectionService implements ImapConnectionService
 
                 return [
                     'address' => (string) $email,
-                    'name' => filled($name) ? (string) $name : null,
+                    'name' => filled($name) ? $this->decodeMimeHeader((string) $name) : null,
                 ];
             })
             ->filter()
@@ -282,7 +282,7 @@ class WebklexImapConnectionService implements ImapConnectionService
                 }
 
                 return [
-                    'filename' => $filename,
+                    'filename' => $this->decodeMimeHeader($filename),
                     'filetype' => $filetype,
                 ];
             })
@@ -318,6 +318,31 @@ class WebklexImapConnectionService implements ImapConnectionService
         $string = $this->stringValue($value);
 
         return filled($string) ? $string : null;
+    }
+
+    protected function decodeMimeHeader(?string $value): ?string
+    {
+        if (! filled($value) || ! str_contains($value, '=?')) {
+            return $value;
+        }
+
+        if (function_exists('iconv_mime_decode')) {
+            $decoded = iconv_mime_decode($value, ICONV_MIME_DECODE_CONTINUE_ON_ERROR, 'UTF-8');
+
+            if ($decoded !== false && filled(trim($decoded))) {
+                return trim($decoded);
+            }
+        }
+
+        if (function_exists('mb_decode_mimeheader')) {
+            $decoded = mb_decode_mimeheader($value);
+
+            if (filled(trim($decoded))) {
+                return trim($decoded);
+            }
+        }
+
+        return $value;
     }
 
     protected function stringValue(mixed $value): ?string

@@ -219,6 +219,73 @@ test('get email builds an email dto from the first matching message across folde
         ->and($email->attachments)->toBe([['filename' => 'invoice.pdf', 'filetype' => 'application/pdf']]);
 });
 
+test('get email decodes mime encoded headers', function () {
+    $message = new class
+    {
+        public function getMessageId(): string
+        {
+            return '<encoded@example.com>';
+        }
+
+        public function getFrom(): array
+        {
+            return [[
+                'address' => 'sender@example.com',
+                'name' => '=?UTF-8?B?Sm9obiBEb8Op?=',
+            ]];
+        }
+
+        public function getTo(): array
+        {
+            return [];
+        }
+
+        public function getCc(): array
+        {
+            return [];
+        }
+
+        public function getSubject(): string
+        {
+            return 'ideaprint.ro =?UTF-8?B?4oCTIDggY3VyaWVyaSwgZsSDcsSD?= abonament';
+        }
+
+        public function getDate(): CarbonImmutable
+        {
+            return CarbonImmutable::parse('2026-04-03 10:00:00');
+        }
+
+        public function getTextBody(): string
+        {
+            return 'Plain body';
+        }
+
+        public function getHTMLBody(): string
+        {
+            return '<p>HTML body</p>';
+        }
+
+        public function getAttachments(): array
+        {
+            return [[
+                'filename' => '=?UTF-8?B?aW52b2ljxIMucGRm?=',
+                'filetype' => 'application/pdf',
+            ]];
+        }
+    };
+
+    $connection = makeImapConnectionWithResource(fakeClientWithFolders([
+        'INBOX' => [$message],
+    ]));
+
+    $service = new WebklexImapConnectionService(Mockery::mock(ClientManager::class));
+    $email = $service->getEmail($connection, '<encoded@example.com>');
+
+    expect($email->subject)->toBe('ideaprint.ro – 8 curieri, fără abonament')
+        ->and($email->fromName)->toBe('John Doé')
+        ->and($email->attachments)->toBe([['filename' => 'invoică.pdf', 'filetype' => 'application/pdf']]);
+});
+
 function makeImapConnectionWithResource(object $resource): ImapConnection
 {
     $user = User::factory()->create();
