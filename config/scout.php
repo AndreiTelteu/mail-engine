@@ -60,10 +60,6 @@ return [
                     'name' => 'emails',
                     'fields' => [
                         [
-                            'name' => 'id',
-                            'type' => 'int64',
-                        ],
-                        [
                             'name' => 'user_id',
                             'type' => 'int64',
                             'facet' => true,

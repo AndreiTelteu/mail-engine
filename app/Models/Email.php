@@ -52,7 +52,7 @@ class Email extends Model
     public function toSearchableArray(): array
     {
         return [
-            'id' => (int) $this->id,
+            'id' => (string) $this->id,
             'user_id' => (int) $this->user_id,
             'from_address' => $this->from_address,
             'from_name' => $this->from_name,
