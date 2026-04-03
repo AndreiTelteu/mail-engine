@@ -14,29 +14,29 @@ The implementation follows this sequence:
 
 ## Tasks
 
-- [ ] 1. Set up database schema and migrations
+- [x] 1. Set up database schema and migrations
   - Create migration for `imap_settings` table with user relationship, encrypted password field, and indexes
   - Create migration for `emails` table with user relationship, message metadata fields, JSON fields for addresses/attachments, and indexes
   - _Requirements: 1.4, 3.6, 3.8, 6.1_
 
-- [ ] 2. Implement core models
-  - [ ] 2.1 Create ImapSetting model with encryption
+- [x] 2. Implement core models
+  - [x] 2.1 Create ImapSetting model with encryption
     - Implement model with fillable fields, casts, and hidden password field
     - Add password encryption mutator and decryption accessor
     - Define user relationship
     - _Requirements: 1.4, 6.1_
   
-  - [ ]* 2.2 Write property test for password encryption
+  - [x]* 2.2 Write property test for password encryption
     - **Property 1: Password Encryption Round-Trip**
     - **Validates: Requirements 1.6, 6.1**
   
-  - [ ] 2.3 Create Email model with Scout integration
+  - [x] 2.3 Create Email model with Scout integration
     - Implement model with fillable fields, casts for JSON and datetime
     - Add Searchable trait and configure toSearchableArray method
     - Define user relationship
     - _Requirements: 3.6, 3.7, 3.8, 4.2_
   
-  - [ ]* 2.4 Write unit tests for Email model
+  - [x]* 2.4 Write unit tests for Email model
     - Test searchable array generation
     - Test relationship definitions
     - Test JSON field casting
