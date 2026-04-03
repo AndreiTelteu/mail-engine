@@ -5,6 +5,7 @@ namespace App\Livewire;
 use App\Models\Email;
 use App\Services\EmailSearchService;
 use Illuminate\Support\Facades\Auth;
+use Livewire\Attributes\On;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -40,6 +41,7 @@ class EmailSearchComponent extends Component
         $this->selectedEmailId = $emailId;
     }
 
+    #[On('close-email-modal')]
     public function closeModal(): void
     {
         $this->selectedEmailId = null;

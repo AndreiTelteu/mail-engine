@@ -11,11 +11,22 @@ use Livewire\Component;
 
 class EmailModalComponent extends Component
 {
+    public ?int $emailId = null;
+
     public ?Email $email = null;
 
     public bool $show = false;
 
     public string $sanitizedBodyHtml = '';
+
+    public function mount(?int $emailId = null): void
+    {
+        $this->emailId = $emailId;
+
+        if ($emailId !== null) {
+            $this->open($emailId);
+        }
+    }
 
     public function open(int $emailId): void
     {
@@ -30,6 +41,7 @@ class EmailModalComponent extends Component
     public function close(): void
     {
         $this->show = false;
+        $this->dispatch('close-email-modal');
     }
 
     public function openInNewTab(): void

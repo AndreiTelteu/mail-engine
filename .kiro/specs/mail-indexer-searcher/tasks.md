@@ -216,14 +216,14 @@ The implementation follows this sequence:
     - Test attachment metadata display
     - _Requirements: 5.2, 5.8, 6.4, 6.6_
 
-- [ ] 12. Create Blade views for Livewire components
-  - [ ] 12.1 Create IMAP settings view
+- [x] 12. Create Blade views for Livewire components
+  - [x] 12.1 Create IMAP settings view
     - Create form with Flux UI components for hostname, port, username, password, encryption
     - Add test connection button with loading state
     - Add save button with validation error display
     - _Requirements: 1.1, 1.2, 1.7, 10.1, 10.6_
   
-  - [ ] 12.2 Create email search view
+  - [x] 12.2 Create email search view
     - Create search input with debouncing
     - Create results list with formatted display (from, subject, preview)
     - Add folder filter dropdown
@@ -231,7 +231,7 @@ The implementation follows this sequence:
     - Highlight search terms in results
     - _Requirements: 4.1, 4.5, 4.6, 4.8, 9.3, 10.2, 10.5_
   
-  - [ ] 12.3 Create email modal view
+  - [x] 12.3 Create email modal view
     - Create modal with email header (from, to, subject, date, folder)
     - Display email body with safe HTML rendering
     - Add attachment metadata list
