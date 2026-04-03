@@ -13,6 +13,9 @@
                 <flux:navbar.item icon="layout-grid" :href="route('dashboard')" :current="request()->routeIs('dashboard')" wire:navigate>
                     {{ __('Dashboard') }}
                 </flux:navbar.item>
+                <flux:navbar.item icon="envelope" :href="route('emails.index')" :current="request()->routeIs('emails.*')" wire:navigate>
+                    {{ __('Emails') }}
+                </flux:navbar.item>
             </flux:navbar>
 
             <flux:spacer />
@@ -55,6 +58,12 @@
                 <flux:sidebar.group :heading="__('Platform')">
                     <flux:sidebar.item icon="layout-grid" :href="route('dashboard')" :current="request()->routeIs('dashboard')" wire:navigate>
                         {{ __('Dashboard')  }}
+                    </flux:sidebar.item>
+                    <flux:sidebar.item icon="envelope" :href="route('emails.index')" :current="request()->routeIs('emails.*')" wire:navigate>
+                        {{ __('Emails') }}
+                    </flux:sidebar.item>
+                    <flux:sidebar.item icon="cog" :href="route('mail.settings')" :current="request()->routeIs('mail.settings')" wire:navigate>
+                        {{ __('Mail settings') }}
                     </flux:sidebar.item>
                 </flux:sidebar.group>
             </flux:sidebar.nav>

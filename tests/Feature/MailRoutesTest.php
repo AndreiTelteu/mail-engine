@@ -53,11 +53,13 @@ test('authenticated users can access the mail settings and search pages', functi
 
     $this->get(route('mail.settings'))
         ->assertOk()
-        ->assertSee('Mail sync');
+        ->assertSee('Mail sync')
+        ->assertSee(route('mail.settings'), false);
 
     $this->get(route('emails.index'))
         ->assertOk()
-        ->assertSee('Mail search');
+        ->assertSee('Mail search')
+        ->assertSee(route('emails.index'), false);
 });
 
 test('authenticated users can open their own email detail page', function () {
