@@ -47,6 +47,12 @@ class EmailSearchComponent extends Component
         $this->selectedEmailId = null;
     }
 
+    #[On('sync-completed')]
+    public function refreshAfterSync(): void
+    {
+        $this->resetPage();
+    }
+
     public function render()
     {
         $user = Auth::user();

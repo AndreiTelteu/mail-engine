@@ -5,9 +5,12 @@
             <flux:subheading>{{ __('Search across indexed mail, filter by folder, and open full messages without leaving the page.') }}</flux:subheading>
         </div>
 
-        <flux:text class="text-sm text-zinc-500 dark:text-zinc-400">
-            {{ trans_choice('{0} No results|{1} :count result|[2,*] :count results', $results->total(), ['count' => $results->total()]) }}
-        </flux:text>
+        <div class="flex items-center gap-3">
+            <flux:text class="text-sm text-zinc-500 dark:text-zinc-400">
+                {{ trans_choice('{0} No results|{1} :count result|[2,*] :count results', $results->total(), ['count' => $results->total()]) }}
+            </flux:text>
+            <livewire:sync-modal-component />
+        </div>
     </div>
 
     @if (session('warning'))
