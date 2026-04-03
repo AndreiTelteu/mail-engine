@@ -22,6 +22,13 @@
                 ->implode(', ');
         @endphp
 
+        @php
+            $attachments = collect($email->attachments ?? [])
+                ->filter(fn (mixed $attachment): bool => is_array($attachment)
+                    && (filled($attachment['filename'] ?? null) || filled($attachment['filetype'] ?? null)))
+                ->values();
+        @endphp
+
         <div @class([
             'fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/60 p-4 backdrop-blur-sm' => ! $standalone,
             'mx-auto w-full max-w-6xl p-4 sm:p-6' => $standalone,
@@ -32,7 +39,7 @@
 
             <article @class([
                 'relative z-10 flex w-full flex-col overflow-hidden border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900',
-                'max-h-[90vh] max-w-4xl rounded-3xl shadow-2xl' => ! $standalone,
+                'max-h-[90vh] max-w-5xl rounded-3xl shadow-2xl' => ! $standalone,
                 'min-h-[70vh] rounded-3xl shadow-sm' => $standalone,
             ])>
                 <div class="flex items-start justify-between gap-4 border-b border-zinc-200 px-6 py-5 dark:border-zinc-800">
@@ -52,7 +59,7 @@
                     </div>
                 </div>
 
-                <div class="grid gap-6 overflow-y-auto px-6 py-5 lg:grid-cols-[minmax(0,1fr)_260px]">
+                <div class="overflow-y-auto px-6 py-5">
                     <div class="space-y-6">
                         <div class="grid gap-4 rounded-2xl border border-zinc-200 bg-zinc-50 p-4 text-sm dark:border-zinc-800 dark:bg-zinc-950/40">
                             <div>
@@ -80,29 +87,40 @@
                                 <div class="whitespace-pre-wrap">{{ $email->body_text }}</div>
                             @endif
                         </div>
-                    </div>
 
-                    <aside class="space-y-4 rounded-2xl border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-950/40">
-                        <div>
-                            <flux:heading size="sm">{{ __('Attachments') }}</flux:heading>
-                            <flux:text class="mt-1 text-zinc-500 dark:text-zinc-400">{{ __('Metadata only — file contents are not stored.') }}</flux:text>
-                        </div>
+                        @if ($attachments->isNotEmpty())
+                            <section class="space-y-4 rounded-2xl border border-zinc-200 bg-zinc-50 p-5 dark:border-zinc-800 dark:bg-zinc-950/40">
+                                <div class="flex flex-wrap items-start justify-between gap-3">
+                                    <div>
+                                        <div class="flex items-center gap-2">
+                                            <flux:icon.paper-clip class="size-4 text-zinc-500 dark:text-zinc-400" />
+                                            <flux:heading size="sm">{{ __('Attachments') }}</flux:heading>
+                                        </div>
+                                        <flux:text class="mt-1 text-zinc-500 dark:text-zinc-400">{{ __('Metadata only — file contents are not stored.') }}</flux:text>
+                                    </div>
 
-                        @if (filled($email->attachments))
-                            <ul class="space-y-3">
-                                @foreach ($email->attachments as $attachment)
-                                    <li class="rounded-xl border border-zinc-200 bg-white px-3 py-3 text-sm dark:border-zinc-800 dark:bg-zinc-900">
-                                        <div class="font-medium text-zinc-900 dark:text-white">{{ $attachment['filename'] ?? __('unknown') }}</div>
-                                        <div class="text-zinc-500 dark:text-zinc-400">{{ $attachment['filetype'] ?? __('unknown') }}</div>
-                                    </li>
-                                @endforeach
-                            </ul>
-                        @else
-                            <div class="rounded-xl border border-dashed border-zinc-300 px-3 py-4 text-sm text-zinc-500 dark:border-zinc-700 dark:text-zinc-400">
-                                {{ __('No attachments for this message.') }}
-                            </div>
+                                    <span class="rounded-full border border-zinc-200 bg-white px-3 py-1 text-xs font-medium text-zinc-600 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300">
+                                        {{ trans_choice('{1} :count attachment|[2,*] :count attachments', $attachments->count(), ['count' => $attachments->count()]) }}
+                                    </span>
+                                </div>
+
+                                <ul class="grid gap-3 md:grid-cols-2">
+                                    @foreach ($attachments as $attachment)
+                                        <li class="flex items-start gap-3 rounded-xl border border-zinc-200 bg-white px-4 py-3 text-sm dark:border-zinc-800 dark:bg-zinc-900">
+                                            <div class="mt-0.5 rounded-lg bg-zinc-100 p-2 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
+                                                <flux:icon.paper-clip class="size-4" />
+                                            </div>
+
+                                            <div class="min-w-0">
+                                                <div class="truncate font-medium text-zinc-900 dark:text-white">{{ $attachment['filename'] ?? __('unknown') }}</div>
+                                                <div class="mt-1 text-zinc-500 dark:text-zinc-400">{{ $attachment['filetype'] ?? __('unknown') }}</div>
+                                            </div>
+                                        </li>
+                                    @endforeach
+                                </ul>
+                            </section>
                         @endif
-                    </aside>
+                    </div>
                 </div>
             </article>
         </div>

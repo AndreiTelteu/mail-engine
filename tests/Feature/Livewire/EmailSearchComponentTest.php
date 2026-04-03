@@ -120,3 +120,24 @@ test('search input uses debounce binding', function () {
     Livewire::test(EmailSearchComponent::class)
         ->assertSeeHtml('wire:model.live.debounce.300ms="query"');
 });
+
+test('search results show an attachment indicator only for emails with attachments', function () {
+    $user = User::factory()->create();
+
+    createEmailForUser($user, [
+        'subject' => 'With attachment',
+        'attachments' => [['filename' => 'invoice.pdf', 'filetype' => 'application/pdf']],
+    ]);
+
+    createEmailForUser($user, [
+        'subject' => 'Without attachment',
+        'attachments' => [],
+    ]);
+
+    $this->actingAs($user);
+
+    Livewire::test(EmailSearchComponent::class)
+        ->assertSee('With attachment')
+        ->assertSee('Without attachment')
+        ->assertSee('1 attachment');
+});

@@ -42,9 +42,23 @@ test('email modal opens and displays sanitized content', function () {
         ->assertSet('show', true)
         ->assertSee('Modal email')
         ->assertSee('sender@example.com')
+        ->assertSee('2 attachments')
         ->assertSee('report.pdf')
         ->assertDontSee('script')
         ->assertDontSee('javascript:');
+});
+
+test('email modal hides the attachments section when the message has no attachments', function () {
+    $user = User::factory()->create();
+    $email = createModalEmail($user, ['attachments' => []]);
+
+    $this->actingAs($user);
+
+    Livewire::test(EmailModalComponent::class)
+        ->call('open', $email->id)
+        ->assertSet('show', true)
+        ->assertDontSee('Attachments')
+        ->assertDontSee('Metadata only');
 });
 
 test('email modal denies access to emails owned by another user', function () {
