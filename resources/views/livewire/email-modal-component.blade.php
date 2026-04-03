@@ -1,4 +1,44 @@
-<section x-data @open-email-in-new-tab.window="window.open($event.detail.url, '_blank', 'noopener')">
+<section
+    x-data="{
+        frameObserver: null,
+        syncEmailFrameHeight() {
+            const frame = this.$refs.emailFrame;
+
+            if (! frame || ! frame.contentDocument) {
+                return;
+            }
+
+            const documentElement = frame.contentDocument.documentElement;
+            const body = frame.contentDocument.body;
+            const nextHeight = Math.max(
+                documentElement ? documentElement.scrollHeight : 0,
+                body ? body.scrollHeight : 0,
+                480,
+            );
+
+            frame.style.height = `${nextHeight}px`;
+
+            if (this.frameObserver) {
+                this.frameObserver.disconnect();
+            }
+
+            if (window.ResizeObserver && body) {
+                this.frameObserver = new ResizeObserver(() => {
+                    const updatedHeight = Math.max(
+                        documentElement ? documentElement.scrollHeight : 0,
+                        body ? body.scrollHeight : 0,
+                        480,
+                    );
+
+                    frame.style.height = `${updatedHeight}px`;
+                });
+
+                this.frameObserver.observe(body);
+            }
+        },
+    }"
+    @open-email-in-new-tab.window="window.open($event.detail.url, '_blank', 'noopener')"
+>
     @if ($show && $email)
         @php
             $toAddresses = collect($email->to_addresses ?? [])
@@ -80,12 +120,16 @@
                             @endif
                         </div>
 
-                        <div class="rounded-2xl border border-zinc-200 bg-white p-5 text-sm leading-7 text-zinc-700 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-200">
-                            @if ($sanitizedBodyHtml !== '')
-                                {!! $sanitizedBodyHtml !!}
-                            @else
-                                <div class="whitespace-pre-wrap">{{ $email->body_text }}</div>
-                            @endif
+                        <div class="overflow-hidden rounded-2xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
+                            <iframe
+                                x-ref="emailFrame"
+                                @load="syncEmailFrameHeight()"
+                                class="block min-h-[30rem] w-full bg-white"
+                                sandbox="allow-popups allow-popups-to-escape-sandbox allow-same-origin"
+                                referrerpolicy="no-referrer"
+                                srcdoc="{{ $iframeDocument }}"
+                                title="{{ $email->subject ?: __('Email content') }}"
+                            ></iframe>
                         </div>
 
                         @if ($attachments->isNotEmpty())

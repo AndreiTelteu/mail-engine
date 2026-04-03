@@ -3,9 +3,6 @@
 namespace App\Livewire;
 
 use App\Models\Email;
-use DOMDocument;
-use DOMElement;
-use DOMXPath;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
 
@@ -19,7 +16,7 @@ class EmailModalComponent extends Component
 
     public bool $show = false;
 
-    public string $sanitizedBodyHtml = '';
+    public string $iframeDocument = '';
 
     public function mount(?int $emailId = null): void
     {
@@ -37,7 +34,7 @@ class EmailModalComponent extends Component
             ->whereBelongsTo(Auth::user())
             ->findOrFail($emailId);
 
-        $this->sanitizedBodyHtml = $this->sanitizeHtml($this->email->body_html);
+        $this->iframeDocument = $this->buildIframeDocument($this->email);
         $this->show = true;
     }
 
@@ -63,64 +60,62 @@ class EmailModalComponent extends Component
         $this->dispatch('open-email-in-new-tab', url: route('emails.show', ['emailId' => $this->email->id]));
     }
 
-    public function sanitizeHtml(?string $html): string
+    protected function buildIframeDocument(Email $email): string
     {
-        if (blank($html)) {
-            return '';
+        if (filled($email->body_html)) {
+            return $this->wrapEmailHtmlDocument($email->body_html);
         }
 
-        $previous = libxml_use_internal_errors(true);
-        $document = new DOMDocument;
+        $plainTextBody = e($email->body_text ?? '');
 
-        if (! @$document->loadHTML(
-            mb_convert_encoding($html, 'HTML-ENTITIES', 'UTF-8'),
-            LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD | LIBXML_NOERROR | LIBXML_NOWARNING,
-        )) {
-            libxml_clear_errors();
-            libxml_use_internal_errors($previous);
+        return $this->wrapEmailHtmlDocument(<<<HTML
+<pre style="margin:0; white-space:pre-wrap; word-break:break-word; font:14px/1.6 Arial, Helvetica, sans-serif; color:#111827;">{$plainTextBody}</pre>
+HTML);
+    }
 
-            return strip_tags($html, '<a><b><blockquote><br><code><div><em><i><li><ol><p><pre><span><strong><table><tbody><td><th><thead><tr><u><ul>');
+    protected function wrapEmailHtmlDocument(string $content): string
+    {
+        $trimmedContent = trim($content);
+
+        if ($trimmedContent === '') {
+            return <<<'HTML'
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+    </head>
+    <body></body>
+</html>
+HTML;
         }
 
-        $xpath = new DOMXPath($document);
-
-        foreach ($xpath->query('//script|//iframe|//object|//embed|//link|//meta|//style|//form') as $node) {
-            $node->parentNode?->removeChild($node);
+        if (preg_match('/<(?:!DOCTYPE|html|body)\b/i', $trimmedContent) === 1) {
+            return $trimmedContent;
         }
 
-        foreach ($xpath->query('//*') as $node) {
-            if (! $node instanceof DOMElement) {
-                continue;
+        return <<<HTML
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <base target="_blank">
+        <style>
+            html, body {
+                margin: 0;
+                padding: 0;
+                background: #ffffff;
             }
 
-            $attributes = [];
-
-            foreach ($node->attributes as $attribute) {
-                $attributes[] = $attribute->name;
+            img, table {
+                max-width: 100%;
             }
-
-            foreach ($attributes as $attributeName) {
-                $value = (string) $node->getAttribute($attributeName);
-
-                if (str_starts_with(strtolower($attributeName), 'on') || strtolower($attributeName) === 'style') {
-                    $node->removeAttribute($attributeName);
-
-                    continue;
-                }
-
-                if (in_array(strtolower($attributeName), ['href', 'src', 'xlink:href', 'formaction'], true)
-                    && str_starts_with(strtolower(trim($value)), 'javascript:')) {
-                    $node->removeAttribute($attributeName);
-                }
-            }
-        }
-
-        $sanitized = $document->saveHTML() ?: '';
-
-        libxml_clear_errors();
-        libxml_use_internal_errors($previous);
-
-        return $sanitized;
+        </style>
+    </head>
+    <body>{$trimmedContent}</body>
+</html>
+HTML;
     }
 
     public function render()
