@@ -4,7 +4,9 @@ namespace App\Providers;
 
 use App\Services\DatabaseEmailIndexingService;
 use App\Services\EmailIndexingService;
+use App\Services\EmailSearchService;
 use App\Services\ImapConnectionService;
+use App\Services\ScoutEmailSearchService;
 use App\Services\WebklexImapConnectionService;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Date;
@@ -23,6 +25,7 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(ClientManager::class, fn (): ClientManager => new ClientManager([]));
         $this->app->singleton(ImapConnectionService::class, WebklexImapConnectionService::class);
         $this->app->singleton(EmailIndexingService::class, DatabaseEmailIndexingService::class);
+        $this->app->singleton(EmailSearchService::class, ScoutEmailSearchService::class);
     }
 
     /**

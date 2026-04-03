@@ -121,14 +121,14 @@ The implementation follows this sequence:
     - Test error handling for IMAP connection failures
     - _Requirements: 8.1, 8.2, 8.3_
 
-- [ ] 8. Configure Laravel scheduler
-  - [ ] 8.1 Add SyncEmailsJob to scheduler
-    - Register job in app/Console/Kernel.php or routes/console.php
+- [x] 8. Configure Laravel scheduler
+  - [x] 8.1 Add SyncEmailsJob to scheduler
+    - Register job in routes/console.php
     - Configure appropriate schedule (e.g., every 15 minutes)
     - _Requirements: 2.1_
 
-- [ ] 9. Implement email search service
-  - [ ] 9.1 Create EmailSearchService interface and implementation
+- [x] 9. Implement email search service
+  - [x] 9.1 Create EmailSearchService interface and implementation
     - Implement search method using Scout with user_id filter and folder filter
     - Implement getRecent method for chronological display when no query
     - Implement formatResult method to generate display string with from, subject, and preview
@@ -136,23 +136,23 @@ The implementation follows this sequence:
     - Add fallback to MySQL LIKE queries when Typesense unavailable
     - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7, 6.2, 8.4, 9.3_
   
-  - [ ]* 9.2 Write property test for search result data isolation
+  - [x]* 9.2 Write property test for search result data isolation
     - **Property 5: Search Result Data Isolation**
     - **Validates: Requirements 4.3, 6.2, 6.4**
   
-  - [ ]* 9.3 Write property test for search result formatting
+  - [x]* 9.3 Write property test for search result formatting
     - **Property 6: Search Result Formatting**
     - **Validates: Requirements 4.5**
   
-  - [ ]* 9.4 Write property test for search term highlighting
+  - [x]* 9.4 Write property test for search term highlighting
     - **Property 7: Search Term Highlighting**
     - **Validates: Requirements 4.6**
   
-  - [ ]* 9.5 Write property test for folder filtering
+  - [x]* 9.5 Write property test for folder filtering
     - **Property 10: Folder Filtering Accuracy**
     - **Validates: Requirements 9.3**
   
-  - [ ]* 9.6 Write unit tests for search service
+  - [x]* 9.6 Write unit tests for search service
     - Test search with various queries
     - Test recent emails retrieval
     - Test result formatting
