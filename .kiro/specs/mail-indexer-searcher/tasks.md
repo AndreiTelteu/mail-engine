@@ -285,38 +285,38 @@ The implementation follows this sequence:
 - [x] 17. Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ]* 18. Write integration tests
-  - [ ]* 18.1 Write IMAP integration tests
+- [x]* 18. Write integration tests
+  - [x]* 18.1 Write IMAP integration tests
     - Test connection to mock IMAP server
     - Test folder and email retrieval
     - Test authentication failure handling
     - _Requirements: 1.3, 2.3, 2.4, 3.1_
   
-  - [ ]* 18.2 Write Typesense integration tests
+  - [x]* 18.2 Write Typesense integration tests
     - Test indexing via Scout
     - Test search query execution with user filter
     - Test unavailability handling
     - _Requirements: 3.7, 4.2, 4.3, 8.4_
   
-  - [ ]* 18.3 Write database integration tests
+  - [x]* 18.3 Write database integration tests
     - Test email storage with transactions
     - Test data isolation queries
     - _Requirements: 3.6, 6.2, 8.5_
 
-- [ ]* 19. Write end-to-end tests
-  - [ ]* 19.1 Test settings configuration flow
+- [x]* 19. Write end-to-end tests
+  - [x]* 19.1 Test settings configuration flow
     - User enters IMAP settings → tests connection → saves settings
     - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.7_
   
-  - [ ]* 19.2 Test email synchronization flow
+  - [x]* 19.2 Test email synchronization flow
     - Trigger sync job → verify emails indexed → verify searchable
     - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 3.6, 3.7_
   
-  - [ ]* 19.3 Test search flow
+  - [x]* 19.3 Test search flow
     - User enters query → results display → clicks email → modal opens
     - _Requirements: 4.1, 4.2, 4.5, 5.1, 5.2_
   
-  - [ ]* 19.4 Test error recovery flow
+  - [x]* 19.4 Test error recovery flow
     - IMAP connection fails → error displayed → user corrects → retry succeeds
     - _Requirements: 1.5, 8.1_
 
