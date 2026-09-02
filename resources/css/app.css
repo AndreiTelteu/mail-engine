@@ -23,16 +23,16 @@
     --color-zinc-900: #171717;
     --color-zinc-950: #0a0a0a;
 
-    --color-accent: var(--color-neutral-800);
-    --color-accent-content: var(--color-neutral-800);
-    --color-accent-foreground: var(--color-white);
+    --color-accent: var(--color-zinc-100);
+    --color-accent-content: var(--color-zinc-100);
+    --color-accent-foreground: var(--color-zinc-950);
 }
 
 @layer theme {
     .dark {
-        --color-accent: var(--color-white);
-        --color-accent-content: var(--color-white);
-        --color-accent-foreground: var(--color-neutral-800);
+        --color-accent: var(--color-zinc-100);
+        --color-accent-content: var(--color-zinc-100);
+        --color-accent-foreground: var(--color-zinc-950);
     }
 }
 
@@ -44,6 +44,49 @@
     ::backdrop,
     ::file-selector-button {
         border-color: var(--color-gray-200, currentColor);
+    }
+
+    html {
+        color-scheme: dark;
+        background: var(--color-zinc-950);
+    }
+
+    ::selection {
+        background: var(--color-zinc-600);
+        color: var(--color-zinc-50);
+    }
+
+    * {
+        scrollbar-color: var(--color-zinc-700) var(--color-zinc-950);
+    }
+}
+
+@layer components {
+    .app-workspace {
+        min-height: 100vh;
+        background:
+            linear-gradient(180deg, rgb(24 24 27 / 0.62) 0, transparent 12rem),
+            var(--color-zinc-950);
+    }
+
+    .workspace-main {
+        width: min(100%, 96rem);
+        margin-inline: auto;
+        padding: 2rem;
+    }
+
+    .workspace-panel {
+        border: 1px solid var(--color-zinc-800);
+        border-radius: 1rem;
+        background: rgb(24 24 27 / 0.78);
+    }
+
+    .workspace-label {
+        color: var(--color-zinc-500);
+        font-size: 0.75rem;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
     }
 }
 
