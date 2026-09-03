@@ -53,13 +53,16 @@ test('authenticated users can access the mail settings and search pages', functi
 
     $this->get(route('mail.settings'))
         ->assertOk()
-        ->assertSee('Mail sync')
-        ->assertSee(route('mail.settings'), false);
+        ->assertInertia(fn ($page) => $page
+            ->component('MailSettings')
+            ->where('setting', null));
 
     $this->get(route('emails.index'))
         ->assertOk()
-        ->assertSee('Mail search')
-        ->assertSee(route('emails.index'), false);
+        ->assertInertia(fn ($page) => $page
+            ->component('Mailbox')
+            ->has('emails.data')
+            ->has('folders'));
 });
 
 test('authenticated users can open their own email detail page', function () {
@@ -69,8 +72,10 @@ test('authenticated users can open their own email detail page', function () {
     $this->actingAs($user)
         ->get(route('emails.show', ['emailId' => $email->id]))
         ->assertOk()
-        ->assertSee('Route detail email')
-        ->assertSee('Route email body');
+        ->assertInertia(fn ($page) => $page
+            ->component('Email')
+            ->where('email.subject', 'Route detail email')
+            ->where('email.document', fn (string $document): bool => str_contains($document, 'Route email body')));
 });
 
 test('authenticated users cannot access another users email detail page', function () {

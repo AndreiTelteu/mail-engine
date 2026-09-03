@@ -1,27 +1,12 @@
 <?php
 
-use App\Livewire\ImapSettingsComponent;
+use App\Http\Controllers\MailSettingsController;
 use Illuminate\Support\Facades\Route;
-use Laravel\Fortify\Features;
 
 Route::middleware(['auth'])->group(function () {
-    Route::redirect('settings', 'settings/profile');
-
-    Route::livewire('settings/profile', 'pages::settings.profile')->name('profile.edit');
-    Route::get('settings/mail', ImapSettingsComponent::class)->name('mail.settings');
-});
-
-Route::middleware(['auth', 'verified'])->group(function () {
-    Route::livewire('settings/appearance', 'pages::settings.appearance')->name('appearance.edit');
-
-    Route::livewire('settings/security', 'pages::settings.security')
-        ->middleware(
-            when(
-                Features::canManageTwoFactorAuthentication()
-                    && Features::optionEnabled(Features::twoFactorAuthentication(), 'confirmPassword'),
-                ['password.confirm'],
-                [],
-            ),
-        )
-        ->name('security.edit');
+    Route::redirect('settings', 'settings/mail');
+    Route::get('settings/mail', [MailSettingsController::class, 'index'])->name('mail.settings');
+    Route::post('settings/mail/test', [MailSettingsController::class, 'test'])->name('mail.settings.test');
+    Route::put('settings/mail', [MailSettingsController::class, 'store'])->name('mail.settings.store');
+    Route::post('settings/mail/sync', [MailSettingsController::class, 'startSync'])->name('mail.settings.sync');
 });
