@@ -1,5 +1,6 @@
 <script setup>
 import { Head, Link, useForm, usePage } from '@inertiajs/vue3';
+import QuotedUtilityLayout from '../Layouts/QuotedUtilityLayout.vue';
 
 const props = defineProps({ setting: Object, syncSession: Object });
 const page = usePage();
@@ -12,36 +13,31 @@ const form = useForm({
     isActive: props.setting?.isActive ?? true,
 });
 
-function testConnection() {
-    form.post('/settings/mail/test', { preserveScroll: true });
-}
-
-function save() {
-    form.put('/settings/mail', { preserveScroll: true });
-}
+const testConnection = () => form.post('/settings/mail/test', { preserveScroll: true });
+const save = () => form.put('/settings/mail', { preserveScroll: true });
 </script>
 
 <template>
     <Head title="Mail settings" />
-    <main class="min-h-screen bg-zinc-950 p-4 text-zinc-100 sm:p-6">
-        <section class="mx-auto max-w-2xl rounded-2xl border border-zinc-800 bg-zinc-900/70 p-6">
-            <div class="flex items-start justify-between gap-4">
-                <div><h1 class="text-xl font-semibold">Mail sync</h1><p class="mt-2 text-sm text-zinc-400">Connect your inbox so new messages can be indexed and searched.</p></div>
-                <Link href="/emails" class="text-sm text-zinc-400 hover:text-zinc-100">Back to mail</Link>
-            </div>
-            <p v-if="syncSession" class="mt-5 rounded-lg border border-zinc-700 px-4 py-3 text-sm text-zinc-300">Sync status: {{ syncSession.status }}</p>
-            <form class="mt-6 space-y-5" @submit.prevent="save">
-                <label class="grid gap-2 text-sm">Hostname<input v-model="form.hostname" class="rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2.5" autocomplete="off" placeholder="imap.example.com"><span v-if="form.errors.hostname" class="text-red-400">{{ form.errors.hostname }}</span></label>
-                <div class="grid gap-5 sm:grid-cols-2">
-                    <label class="grid gap-2 text-sm">Port<input v-model.number="form.port" class="rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2.5" type="number" min="1" max="65535"><span v-if="form.errors.port" class="text-red-400">{{ form.errors.port }}</span></label>
-                    <label class="grid gap-2 text-sm">Username<input v-model="form.username" class="rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2.5" autocomplete="username"><span v-if="form.errors.username" class="text-red-400">{{ form.errors.username }}</span></label>
+    <QuotedUtilityLayout title="Connection station" description="Set the source for your private index. Credentials are encrypted before they are stored.">
+        <div class="grid lg:grid-cols-[minmax(0,1fr)_15rem]">
+            <form class="p-5 sm:p-8" @submit.prevent="save">
+                <div class="grid gap-6">
+                    <label class="grid gap-2 text-sm font-bold uppercase tracking-wide">Hostname<input v-model="form.hostname" class="utility-input normal-case tracking-normal" autocomplete="off" placeholder="imap.example.com"><span v-if="form.errors.hostname" class="font-medium normal-case tracking-normal text-utility-signal">{{ form.errors.hostname }}</span></label>
+                    <div class="grid gap-6 sm:grid-cols-2"><label class="grid gap-2 text-sm font-bold uppercase tracking-wide">Port<input v-model.number="form.port" class="utility-input normal-case tracking-normal" type="number" min="1" max="65535"><span v-if="form.errors.port" class="font-medium normal-case tracking-normal text-utility-signal">{{ form.errors.port }}</span></label><label class="grid gap-2 text-sm font-bold uppercase tracking-wide">Username<input v-model="form.username" class="utility-input normal-case tracking-normal" autocomplete="username"><span v-if="form.errors.username" class="font-medium normal-case tracking-normal text-utility-signal">{{ form.errors.username }}</span></label></div>
+                    <label class="grid gap-2 text-sm font-bold uppercase tracking-wide">Password<input v-model="form.password" class="utility-input normal-case tracking-normal" type="password" autocomplete="current-password"><span v-if="form.errors.password" class="font-medium normal-case tracking-normal text-utility-signal">{{ form.errors.password }}</span></label>
+                    <fieldset><legend class="text-sm font-bold uppercase tracking-wide">Encryption</legend><div class="mt-3 flex flex-wrap gap-3"><label v-for="option in [{ value: 'ssl', label: 'SSL' }, { value: 'tls', label: 'TLS' }, { value: '', label: 'None' }]" :key="option.label" class="cursor-pointer border border-utility-ink px-4 py-3 text-sm font-bold has-[:checked]:bg-utility-signal"><input v-model="form.encryption" class="sr-only" type="radio" :value="option.value"><span>{{ option.label }}</span></label></div></fieldset>
+                    <label class="flex cursor-pointer gap-3 border border-utility-ink p-4 has-[:checked]:bg-utility-ink has-[:checked]:text-utility-paper"><input v-model="form.isActive" class="mt-1 size-4 accent-utility-signal" type="checkbox"><span><b class="block text-sm uppercase tracking-wide">Enable background sync</b><span class="mt-1 block text-sm opacity-70">Allow scheduled work to fetch and index mail.</span></span></label>
+                    <p v-if="page.props.flash.success" class="border border-utility-ink bg-utility-signal p-4 text-sm font-bold">{{ page.props.flash.success }}</p>
+                    <div class="flex flex-wrap gap-3"><button class="utility-button utility-button-secondary" type="button" :disabled="form.processing" @click="testConnection">{{ form.processing ? 'Testing…' : 'Test connection' }}</button><button class="utility-button" :disabled="form.processing">{{ form.processing ? 'Saving…' : 'Save settings' }}</button></div>
                 </div>
-                <label class="grid gap-2 text-sm">Password<input v-model="form.password" class="rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2.5" type="password" autocomplete="current-password"><span v-if="form.errors.password" class="text-red-400">{{ form.errors.password }}</span></label>
-                <fieldset><legend class="text-sm">Encryption</legend><div class="mt-2 flex gap-4 text-sm"><label><input v-model="form.encryption" type="radio" value="ssl"> SSL</label><label><input v-model="form.encryption" type="radio" value="tls"> TLS</label><label><input v-model="form.encryption" type="radio" value=""> None</label></div></fieldset>
-                <label class="flex gap-3 rounded-xl border border-zinc-700 p-4 text-sm"><input v-model="form.isActive" type="checkbox"><span><b class="block">Enable background sync</b><span class="text-zinc-400">Allow scheduled jobs to fetch and index mail for this account.</span></span></label>
-                <p v-if="page.props.flash.success" class="rounded-lg border border-emerald-800 bg-emerald-950/40 px-4 py-3 text-sm text-emerald-300">{{ page.props.flash.success }}</p>
-                <div class="flex flex-wrap gap-3"><button class="rounded-lg border border-zinc-700 px-4 py-2 text-sm disabled:opacity-50" type="button" :disabled="form.processing" @click="testConnection">{{ form.processing ? 'Testing...' : 'Test connection' }}</button><button class="rounded-lg bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-950 disabled:opacity-50" :disabled="form.processing">{{ form.processing ? 'Saving...' : 'Save settings' }}</button><Link v-if="!syncSession?.isActive" as="button" href="/settings/mail/sync" method="post" class="rounded-lg border border-zinc-700 px-4 py-2 text-sm">Start sync</Link></div>
             </form>
-        </section>
-    </main>
+            <aside class="border-t border-utility-ink bg-utility-ink p-5 text-utility-paper lg:border-l lg:border-t-0">
+                <p class="font-mono text-[0.7rem] font-bold uppercase tracking-[0.12em] text-utility-signal">Sync status</p>
+                <p v-if="syncSession" class="mt-4 text-2xl font-black uppercase">{{ syncSession.status }}</p><p v-else class="mt-4 text-lg font-bold">No active sync.</p>
+                <Link v-if="!syncSession?.isActive" as="button" href="/settings/mail/sync" method="post" class="mt-6 border-b border-utility-paper pb-1 text-xs font-extrabold uppercase tracking-[0.08em] hover:text-utility-signal">Start sync now</Link>
+                <p class="mt-10 border-t border-utility-paper/30 pt-4 text-sm leading-5 text-utility-paper/65">Your mailbox data stays scoped to your account. Search reads from your private index.</p>
+            </aside>
+        </div>
+    </QuotedUtilityLayout>
 </template>

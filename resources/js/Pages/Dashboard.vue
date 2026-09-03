@@ -1,17 +1,14 @@
 <script setup>
 import { Head, Link } from '@inertiajs/vue3';
+import QuotedUtilityLayout from '../Layouts/QuotedUtilityLayout.vue';
 </script>
 
 <template>
-    <Head title="Dashboard" />
-    <main class="grid min-h-screen place-items-center bg-zinc-950 p-6 text-zinc-100">
-        <section class="w-full max-w-xl rounded-2xl border border-zinc-800 bg-zinc-900/70 p-8">
-            <h1 class="text-2xl font-semibold">Mailbox workspace</h1>
-            <p class="mt-3 text-zinc-400">Search indexed messages or manage the IMAP connection.</p>
-            <div class="mt-6 flex flex-wrap gap-3">
-                <Link href="/emails" class="rounded-lg bg-zinc-100 px-4 py-2 font-medium text-zinc-950">Search mail</Link>
-                <Link href="/settings/mail" class="rounded-lg border border-zinc-700 px-4 py-2 hover:bg-zinc-800">Mail settings</Link>
-            </div>
-        </section>
-    </main>
+    <Head title="Workspace" />
+    <QuotedUtilityLayout title="Ready to retrieve" description="Choose a station. Your mailbox remains private; search stays fast.">
+        <div class="grid border-b border-utility-ink md:grid-cols-2">
+            <Link href="/emails" class="group relative min-h-72 border-b border-utility-ink p-6 transition-colors hover:bg-utility-signal md:border-b-0 md:border-r sm:p-8"><span class="font-mono text-xs font-bold">01 / MAILBOX</span><h2 class="mt-16 max-w-sm text-4xl font-black uppercase leading-[0.86] tracking-[-0.06em]">Find the<br>message.</h2><span class="absolute bottom-7 right-7 text-3xl transition-transform group-hover:translate-x-2" aria-hidden="true">→</span></Link>
+            <Link href="/settings/mail" class="group relative min-h-72 bg-utility-ink p-6 text-utility-paper transition-colors hover:bg-utility-signal hover:text-utility-ink sm:p-8"><span class="font-mono text-xs font-bold text-utility-signal group-hover:text-utility-ink">02 / CONNECTION</span><h2 class="mt-16 max-w-sm text-4xl font-black uppercase leading-[0.86] tracking-[-0.06em]">Set the<br>source.</h2><span class="absolute bottom-7 right-7 text-3xl transition-transform group-hover:translate-x-2" aria-hidden="true">→</span></Link>
+        </div>
+    </QuotedUtilityLayout>
 </template>

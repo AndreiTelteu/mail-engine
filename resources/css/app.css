@@ -2,108 +2,38 @@
 @import '../../vendor/livewire/flux/dist/flux.css';
 
 @source '../views';
+@source '../js';
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
-@source '../../vendor/livewire/flux-pro/stubs/**/*.blade.php';
-@source '../../vendor/livewire/flux/stubs/**/*.blade.php';
-
-@custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
-
-    --color-zinc-50: #fafafa;
-    --color-zinc-100: #f5f5f5;
-    --color-zinc-200: #e5e5e5;
-    --color-zinc-300: #d4d4d4;
-    --color-zinc-400: #a3a3a3;
-    --color-zinc-500: #737373;
-    --color-zinc-600: #525252;
-    --color-zinc-700: #404040;
-    --color-zinc-800: #262626;
-    --color-zinc-900: #171717;
-    --color-zinc-950: #0a0a0a;
-
-    --color-accent: var(--color-zinc-100);
-    --color-accent-content: var(--color-zinc-100);
-    --color-accent-foreground: var(--color-zinc-950);
-}
-
-@layer theme {
-    .dark {
-        --color-accent: var(--color-zinc-100);
-        --color-accent-content: var(--color-zinc-100);
-        --color-accent-foreground: var(--color-zinc-950);
-    }
+    --font-sans: 'Arial Narrow', 'Roboto Condensed', Arial, sans-serif;
+    --font-mono: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
+    --color-utility-paper: #f6f6f0;
+    --color-utility-ink: #121212;
+    --color-utility-muted: #686861;
+    --color-utility-line: #c8c8bd;
+    --color-utility-signal: #fb5a20;
 }
 
 @layer base {
-
-    *,
-    ::after,
-    ::before,
-    ::backdrop,
-    ::file-selector-button {
-        border-color: var(--color-gray-200, currentColor);
-    }
-
-    html {
-        color-scheme: dark;
-        background: var(--color-zinc-950);
-    }
-
-    ::selection {
-        background: var(--color-zinc-600);
-        color: var(--color-zinc-50);
-    }
-
-    * {
-        scrollbar-color: var(--color-zinc-700) var(--color-zinc-950);
-    }
+    html { background: var(--color-utility-paper); color: var(--color-utility-ink); }
+    body { min-width: 20rem; background: var(--color-utility-paper); }
+    ::selection { background: var(--color-utility-signal); color: var(--color-utility-ink); }
+    :focus-visible { outline: 3px solid var(--color-utility-signal); outline-offset: 3px; }
+    * { scrollbar-color: var(--color-utility-ink) var(--color-utility-paper); }
 }
 
 @layer components {
-    .app-workspace {
-        min-height: 100vh;
-        background:
-            linear-gradient(180deg, rgb(24 24 27 / 0.62) 0, transparent 12rem),
-            var(--color-zinc-950);
+    .utility-grid {
+        background-image: linear-gradient(to right, rgb(18 18 18 / 0.07) 1px, transparent 1px), linear-gradient(to bottom, rgb(18 18 18 / 0.07) 1px, transparent 1px);
+        background-size: 2rem 2rem;
     }
-
-    .workspace-main {
-        width: min(100%, 96rem);
-        margin-inline: auto;
-        padding: 2rem;
-    }
-
-    .workspace-panel {
-        border: 1px solid var(--color-zinc-800);
-        border-radius: 1rem;
-        background: rgb(24 24 27 / 0.78);
-    }
-
-    .workspace-label {
-        color: var(--color-zinc-500);
-        font-size: 0.75rem;
-        font-weight: 600;
-        letter-spacing: 0.04em;
-        text-transform: uppercase;
-    }
+    .utility-stripe { background: repeating-linear-gradient(135deg, var(--color-utility-ink) 0 10px, var(--color-utility-paper) 10px 20px); }
+    .utility-input { width: 100%; border: 1px solid var(--color-utility-ink); border-radius: 0; background: #fff; padding: 0.8rem 0.9rem; color: var(--color-utility-ink); font: 500 0.875rem/1.25 var(--font-sans); }
+    .utility-input::placeholder { color: var(--color-utility-muted); }
+    .utility-input:focus { outline: 3px solid var(--color-utility-signal); outline-offset: -1px; }
+    .utility-button { display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; border: 1px solid var(--color-utility-ink); border-radius: 0; background: var(--color-utility-ink); padding: 0.75rem 1rem; color: var(--color-utility-paper); font-size: 0.75rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; transition: background-color 150ms ease-out, color 150ms ease-out, transform 150ms ease-out; }
+    .utility-button:hover:not(:disabled) { background: var(--color-utility-signal); color: var(--color-utility-ink); transform: translateY(-1px); }
+    .utility-button:disabled { cursor: not-allowed; opacity: 0.45; }
+    .utility-button-secondary { background: transparent; color: var(--color-utility-ink); }
 }
-
-[data-flux-field]:not(ui-radio, ui-checkbox) {
-    @apply grid gap-2;
-}
-
-[data-flux-label] {
-    @apply  !mb-0 !leading-tight;
-}
-
-input:focus[data-flux-control],
-textarea:focus[data-flux-control],
-select:focus[data-flux-control] {
-    @apply outline-hidden ring-2 ring-accent ring-offset-2 ring-offset-accent-foreground;
-}
-
-/* \[:where(&)\]:size-4 {
-    @apply size-4;
-} */

@@ -1,51 +1,29 @@
 <script setup>
 import { Head, Link } from '@inertiajs/vue3';
+import QuotedUtilityLayout from '../Layouts/QuotedUtilityLayout.vue';
 
 defineProps({ email: Object });
 </script>
 
 <template>
     <Head :title="email.subject" />
-
-    <main class="min-h-screen bg-zinc-950 p-4 text-zinc-100 sm:p-6">
-        <article class="mx-auto max-w-6xl overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900/70">
-            <header class="flex flex-wrap items-start justify-between gap-4 border-b border-zinc-800 p-5">
-                <div>
-                    <p class="text-xs text-zinc-500">{{ email.folder }} · {{ email.date }}</p>
-                    <h1 class="mt-2 text-xl font-semibold">{{ email.subject }}</h1>
-                    <p class="mt-2 text-sm text-zinc-300">{{ email.from }}</p>
-                </div>
-                <div class="flex gap-2">
-                    <a :href="`/emails/${email.id}`" target="_blank" class="rounded-lg border border-zinc-700 px-3 py-2 text-sm hover:bg-zinc-800">Open in new tab</a>
-                    <Link href="/emails" class="rounded-lg bg-zinc-100 px-3 py-2 text-sm font-medium text-zinc-950 hover:bg-white">Back to mail</Link>
+    <QuotedUtilityLayout title="Message record" description="Inspect the message in an isolated reading surface.">
+        <article>
+            <header class="border-b border-utility-ink p-5 sm:p-8">
+                <div class="flex flex-wrap items-start justify-between gap-6">
+                    <div class="max-w-3xl"><p class="font-mono text-[0.7rem] font-bold uppercase tracking-[0.12em] text-utility-muted">{{ email.folder }} / {{ email.date }}</p><h2 class="mt-4 text-3xl font-black uppercase leading-[0.9] tracking-[-0.05em] sm:text-5xl">{{ email.subject }}</h2></div>
+                    <div class="flex flex-wrap gap-2"><a :href="`/emails/${email.id}`" target="_blank" class="utility-button utility-button-secondary">New tab</a><Link href="/emails" class="utility-button">Back to mailbox</Link></div>
                 </div>
             </header>
-
-            <div class="space-y-6 p-5">
-                <dl class="grid gap-3 rounded-xl border border-zinc-800 bg-zinc-950/50 p-4 text-sm">
-                    <div><dt class="font-medium">From</dt><dd class="mt-1 text-zinc-400">{{ email.from }}</dd></div>
-                    <div><dt class="font-medium">To</dt><dd class="mt-1 text-zinc-400">{{ email.to || 'No recipients recorded' }}</dd></div>
-                    <div v-if="email.cc"><dt class="font-medium">Cc</dt><dd class="mt-1 text-zinc-400">{{ email.cc }}</dd></div>
-                </dl>
-
-                <iframe
-                    class="min-h-[30rem] w-full rounded-xl bg-white"
-                    sandbox="allow-popups allow-popups-to-escape-sandbox allow-same-origin"
-                    referrerpolicy="no-referrer"
-                    :srcdoc="email.document"
-                    :title="email.subject"
-                />
-
-                <section v-if="email.attachments.length" class="rounded-xl border border-zinc-800 p-4">
-                    <h2 class="font-medium">Attachments</h2>
-                    <p class="mt-1 text-sm text-zinc-400">Metadata only — file contents are not stored.</p>
-                    <ul class="mt-4 grid gap-2 sm:grid-cols-2">
-                        <li v-for="attachment in email.attachments" :key="`${attachment.filename}-${attachment.filetype}`" class="rounded-lg bg-zinc-800 px-3 py-2 text-sm">
-                            <p>{{ attachment.filename }}</p><p class="mt-1 text-zinc-400">{{ attachment.filetype }}</p>
-                        </li>
-                    </ul>
-                </section>
+            <div class="grid lg:grid-cols-[17rem_minmax(0,1fr)]">
+                <aside class="border-b border-utility-ink p-5 lg:border-b-0 lg:border-r">
+                    <dl class="grid gap-5 text-sm"><div><dt class="font-mono text-[0.65rem] font-bold uppercase tracking-[0.12em] text-utility-muted">From</dt><dd class="mt-2 break-words font-bold">{{ email.from }}</dd></div><div><dt class="font-mono text-[0.65rem] font-bold uppercase tracking-[0.12em] text-utility-muted">To</dt><dd class="mt-2 break-words">{{ email.to || 'No recipients recorded' }}</dd></div><div v-if="email.cc"><dt class="font-mono text-[0.65rem] font-bold uppercase tracking-[0.12em] text-utility-muted">Cc</dt><dd class="mt-2 break-words">{{ email.cc }}</dd></div></dl>
+                </aside>
+                <div class="bg-white p-3 sm:p-6">
+                    <iframe class="min-h-[38rem] w-full border border-utility-ink bg-white" sandbox="allow-popups allow-popups-to-escape-sandbox allow-same-origin" referrerpolicy="no-referrer" :srcdoc="email.document" :title="email.subject" />
+                </div>
             </div>
+            <section v-if="email.attachments.length" class="border-t border-utility-ink p-5 sm:p-8"><h2 class="text-xl font-black uppercase tracking-[-0.04em]">Attachment record</h2><p class="mt-2 text-sm text-utility-muted">Metadata only. File contents are not stored.</p><ul class="mt-5 grid gap-3 sm:grid-cols-2"><li v-for="attachment in email.attachments" :key="`${attachment.filename}-${attachment.filetype}`" class="border border-utility-ink p-4"><p class="font-bold">{{ attachment.filename }}</p><p class="mt-1 font-mono text-xs uppercase text-utility-muted">{{ attachment.filetype }}</p></li></ul></section>
         </article>
-    </main>
+    </QuotedUtilityLayout>
 </template>
