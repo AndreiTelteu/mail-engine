@@ -62,7 +62,22 @@ test('authenticated users can access the mail settings and search pages', functi
         ->assertInertia(fn ($page) => $page
             ->component('Mailbox')
             ->has('emails.data')
-            ->has('folders'));
+            ->has('folders')
+            ->where('selectedEmail', null));
+});
+
+test('authenticated users can select one of their emails in the mailbox workspace', function () {
+    $user = User::factory()->create();
+    $email = createRoutedEmail($user);
+
+    $this->actingAs($user)
+        ->get(route('emails.index', ['email' => $email->id]))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('Mailbox')
+            ->where('filters.email', $email->id)
+            ->where('selectedEmail.subject', 'Route detail email')
+            ->where('selectedEmail.document', fn (string $document): bool => str_contains($document, 'Route email body')));
 });
 
 test('authenticated users can open their own email detail page', function () {

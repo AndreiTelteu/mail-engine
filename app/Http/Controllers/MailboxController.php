@@ -6,6 +6,7 @@ use App\Models\Email;
 use App\Models\User;
 use App\Services\EmailSearchService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -16,15 +17,22 @@ class MailboxController extends Controller
         $validated = $request->validate([
             'query' => ['nullable', 'string', 'max:250'],
             'folder' => ['nullable', 'string', 'max:255'],
+            'email' => ['nullable', 'integer'],
         ]);
 
         /** @var User $user */
         $user = $request->user();
         $query = $validated['query'] ?? '';
         $folder = $validated['folder'] ?? null;
+        $selectedEmailId = isset($validated['email'])
+            ? (int) $validated['email']
+            : null;
         $results = blank($query) && $folder === null
             ? $searchService->getRecent($user)
             : $searchService->search($user, $query, $folder);
+        $selectedEmail = $selectedEmailId === null
+            ? null
+            : Email::query()->whereBelongsTo($user)->find($selectedEmailId);
 
         return Inertia::render('Mailbox', [
             'folders' => Email::query()
@@ -37,7 +45,11 @@ class MailboxController extends Controller
             'filters' => [
                 'query' => $query,
                 'folder' => $folder,
+                'email' => $selectedEmailId,
             ],
+            'selectedEmail' => $selectedEmail instanceof Email
+                ? $this->emailDetail($selectedEmail)
+                : null,
             'emails' => [
                 'data' => collect($results->items())
                     ->map(fn (Email $email): array => [
@@ -60,28 +72,34 @@ class MailboxController extends Controller
             ->whereBelongsTo($user)
             ->findOrFail($emailId);
 
-        return Inertia::render('Email', [
-            'email' => [
-                'id' => $email->id,
-                'folder' => $email->folder,
-                'from' => $email->from_name
-                    ? "{$email->from_name} <{$email->from_address}>"
-                    : $email->from_address,
-                'to' => $this->formatAddresses($email->to_addresses),
-                'cc' => $this->formatAddresses($email->cc_addresses),
-                'subject' => $email->subject ?: '(no subject)',
-                'date' => $email->date?->format('M j, Y g:i A'),
-                'document' => $this->iframeDocument($email),
-                'attachments' => collect($email->attachments)
-                    ->filter(fn (array $attachment): bool => filled($attachment['filename'] ?? null)
-                        || filled($attachment['filetype'] ?? null))
-                    ->map(fn (array $attachment): array => [
-                        'filename' => $attachment['filename'] ?? 'unknown',
-                        'filetype' => $attachment['filetype'] ?? 'unknown',
-                    ])
-                    ->values(),
-            ],
-        ]);
+        return Inertia::render('Email', ['email' => $this->emailDetail($email)]);
+    }
+
+    /**
+     * @return array{id: int, folder: string, from: string, to: string, cc: string, subject: string, date: ?string, document: string, attachments: Collection<int, array{filename: string, filetype: string}>}
+     */
+    private function emailDetail(Email $email): array
+    {
+        return [
+            'id' => $email->id,
+            'folder' => $email->folder,
+            'from' => $email->from_name
+                ? "{$email->from_name} <{$email->from_address}>"
+                : $email->from_address,
+            'to' => $this->formatAddresses($email->to_addresses),
+            'cc' => $this->formatAddresses($email->cc_addresses),
+            'subject' => $email->subject ?: '(no subject)',
+            'date' => $email->date?->format('M j, Y g:i A'),
+            'document' => $this->iframeDocument($email),
+            'attachments' => collect($email->attachments)
+                ->filter(fn (array $attachment): bool => filled($attachment['filename'] ?? null)
+                    || filled($attachment['filetype'] ?? null))
+                ->map(fn (array $attachment): array => [
+                    'filename' => $attachment['filename'] ?? 'unknown',
+                    'filetype' => $attachment['filetype'] ?? 'unknown',
+                ])
+                ->values(),
+        ];
     }
 
     /**
