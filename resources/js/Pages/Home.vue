@@ -1,17 +1,60 @@
 <script setup>
-import { Head, Link } from '@inertiajs/vue3';
+import { Head, Link, usePage } from '@inertiajs/vue3';
+import { computed } from 'vue';
+import AppIcon from '../Components/AppIcon.vue';
+import AppMark from '../Components/AppMark.vue';
+import { routes } from '../routes';
+
+const page = usePage();
+const user = computed(() => page.props.auth?.user);
 </script>
 
 <template>
-    <Head title="Mail Engine" />
-    <main class="min-h-screen bg-utility-paper text-utility-ink">
-        <div class="utility-stripe h-3" aria-hidden="true" />
-        <section class="utility-grid min-h-[calc(100vh-0.75rem)] p-4 sm:p-8">
-            <div class="mx-auto flex min-h-[calc(100vh-4.75rem)] max-w-[100rem] flex-col justify-between border border-utility-ink bg-utility-paper p-6 sm:p-10">
-                <div class="flex items-start justify-between gap-6"><p class="font-mono text-xs font-bold tracking-[0.12em]">MAIL ENGINE / PRIVATE MAIL RETRIEVAL</p><span class="h-3 w-3 bg-utility-signal" aria-label="System ready" /></div>
-                <div class="max-w-5xl py-16"><h1 class="text-5xl font-black uppercase leading-[0.78] tracking-[-0.075em] sm:text-7xl lg:text-9xl">Your mail.<br>Under control.</h1><p class="mt-8 max-w-xl text-lg font-medium leading-7 text-utility-muted">A private workspace that finds the message you need without making your inbox somebody else’s product.</p><Link href="/dashboard" class="utility-button mt-10">Enter workspace <span aria-hidden="true">→</span></Link></div>
-                <div class="flex flex-wrap justify-between gap-4 border-t border-utility-ink pt-4 font-mono text-[0.7rem] font-bold uppercase tracking-[0.1em]"><span>IMAP connected on your terms</span><span>Local search index</span><span>Untrusted HTML isolated</span></div>
+    <Head :title="null" />
+
+    <main class="grid min-h-svh place-items-center bg-canvas px-4 py-10 text-ink">
+        <div class="w-full max-w-[22rem]">
+            <div class="mb-6 inline-flex items-center gap-2 text-md font-semibold tracking-[-0.01em]">
+                <AppMark :size="22" />
+                {{ page.props.appName }}
             </div>
-        </section>
+
+            <div class="panel p-6 shadow-overlay">
+                <h1 class="text-xl font-semibold tracking-[-0.01em]">Your mailbox, searchable.</h1>
+                <p class="mt-1.5 text-ink-muted">
+                    A private, self-hosted client for the mailbox you already have. Messages are indexed on this
+                    server so you can find and read any of them in seconds.
+                </p>
+
+                <div class="mt-5 grid gap-2">
+                    <template v-if="user">
+                        <Link :href="routes.mailbox" class="btn btn-primary btn-lg">
+                            <AppIcon name="mail" :size="15" />
+                            Open mail
+                        </Link>
+                        <Link :href="routes.dashboard" class="btn btn-secondary btn-lg">Go to overview</Link>
+                    </template>
+                    <template v-else>
+                        <a :href="routes.login" class="btn btn-primary btn-lg">Log in</a>
+                        <a :href="routes.register" class="btn btn-secondary btn-lg">Create an account</a>
+                    </template>
+                </div>
+            </div>
+
+            <ul class="mt-5 grid gap-1.5">
+                <li
+                    v-for="item in [
+                        'Connects to your own IMAP mailbox',
+                        'Full-text search over an index kept on this server',
+                        'Message HTML sanitized and sandboxed before it renders',
+                    ]"
+                    :key="item"
+                    class="flex items-start gap-2 text-sm text-ink-subtle"
+                >
+                    <AppIcon name="check" :size="13" class="mt-0.5 text-positive-text" />
+                    {{ item }}
+                </li>
+            </ul>
+        </div>
     </main>
 </template>

@@ -18,6 +18,7 @@ class MailboxController extends Controller
             'query' => ['nullable', 'string', 'max:250'],
             'folder' => ['nullable', 'string', 'max:255'],
             'email' => ['nullable', 'integer'],
+            'page' => ['nullable', 'integer', 'min:1'],
         ]);
 
         /** @var User $user */
@@ -35,13 +36,8 @@ class MailboxController extends Controller
             : Email::query()->whereBelongsTo($user)->find($selectedEmailId);
 
         return Inertia::render('Mailbox', [
-            'folders' => Email::query()
-                ->whereBelongsTo($user)
-                ->select('folder')
-                ->distinct()
-                ->orderBy('folder')
-                ->pluck('folder')
-                ->values(),
+            'folders' => $this->folderCounts($user),
+            'indexedTotal' => Email::query()->whereBelongsTo($user)->count(),
             'filters' => [
                 'query' => $query,
                 'folder' => $folder,
@@ -54,14 +50,36 @@ class MailboxController extends Controller
                 'data' => collect($results->items())
                     ->map(fn (Email $email): array => [
                         'id' => $email->id,
+                        'attachmentCount' => count($email->attachments ?? []),
                         ...$searchService->formatResult($email, $query ?: null),
                     ])
                     ->values(),
                 'currentPage' => $results->currentPage(),
                 'lastPage' => $results->lastPage(),
                 'total' => $results->total(),
+                'from' => $results->firstItem(),
+                'to' => $results->lastItem(),
             ],
         ]);
+    }
+
+    /**
+     * The user's folders with the number of indexed messages in each.
+     *
+     * @return Collection<int, array{name: string, count: int}>
+     */
+    private function folderCounts(User $user): Collection
+    {
+        return Email::query()
+            ->whereBelongsTo($user)
+            ->selectRaw('folder, count(*) as aggregate')
+            ->groupBy('folder')
+            ->orderBy('folder')
+            ->get()
+            ->map(fn (Email $email): array => [
+                'name' => $email->folder,
+                'count' => (int) $email->getAttribute('aggregate'),
+            ]);
     }
 
     public function show(Request $request, int $emailId): Response

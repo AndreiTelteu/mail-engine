@@ -13,6 +13,8 @@ interface EmailSearchService
     public function getRecent(User $user, int $perPage = 20): LengthAwarePaginator;
 
     /**
+     * Escaped HTML fragments for one result: matched terms are wrapped in `<mark>`.
+     *
      * @return array{from:string,subject:string,preview:string,display:string,folder:string,date:string}
      */
     public function formatResult(Email $email, ?string $query = null): array;

@@ -1,0 +1,7 @@
+/*
+ * Stylesheet for the Blade-rendered screens (authentication, two-factor) that are
+ * still built with Flux. It carries the same tokens as the Inertia application
+ * plus Flux's own component CSS, which the Inertia bundle does not need.
+ */
+@import './app.css';
+@import '../../vendor/livewire/flux/dist/flux.css';

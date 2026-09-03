@@ -66,6 +66,62 @@ test('authenticated users can access the mail settings and search pages', functi
             ->where('selectedEmail', null));
 });
 
+test('the mailbox lists folders with counts, attachment counts, and paging details', function () {
+    $user = User::factory()->create();
+
+    foreach (range(1, 21) as $index) {
+        createRoutedEmail($user, [
+            'folder' => $index > 18 ? 'Archive' : 'INBOX',
+            'subject' => "Listed email {$index}",
+            'attachments' => $index === 1
+                ? [['filename' => 'invoice.pdf', 'filetype' => 'pdf']]
+                : [],
+        ]);
+    }
+
+    $this->actingAs($user)
+        ->get(route('emails.index'))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('Mailbox')
+            ->where('indexedTotal', 21)
+            ->where('folders', [
+                ['name' => 'Archive', 'count' => 3],
+                ['name' => 'INBOX', 'count' => 18],
+            ])
+            ->where('emails.total', 21)
+            ->where('emails.currentPage', 1)
+            ->where('emails.lastPage', 2)
+            ->where('emails.from', 1)
+            ->where('emails.to', 20)
+            ->has('emails.data.0.attachmentCount'));
+
+    $this->actingAs($user)
+        ->get(route('emails.index', ['folder' => 'Archive', 'page' => 1]))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->where('filters.folder', 'Archive')
+            ->where('emails.total', 3)
+            ->where('emails.lastPage', 1));
+
+    $this->actingAs($user)
+        ->get(route('emails.index', ['page' => 2]))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page->where('emails.currentPage', 2));
+});
+
+test('search results carry escaped highlight markup', function () {
+    $user = User::factory()->create();
+    createRoutedEmail($user, ['subject' => 'Invoice <b>April</b>']);
+
+    $this->actingAs($user)
+        ->get(route('emails.index', ['query' => 'invoice']))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->where('emails.data.0.subject', fn (string $subject): bool => str_contains($subject, '<mark>Invoice</mark>')
+                && ! str_contains($subject, '<b>')));
+});
+
 test('authenticated users can select one of their emails in the mailbox workspace', function () {
     $user = User::factory()->create();
     $email = createRoutedEmail($user);

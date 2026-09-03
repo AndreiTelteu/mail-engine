@@ -1,20 +1,21 @@
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="dark">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" data-theme="dark" class="dark">
     <head>
         @include('partials.head')
     </head>
-    <body class="min-h-screen bg-white antialiased dark:bg-linear-to-b dark:from-neutral-950 dark:to-neutral-900">
-        <div class="bg-background flex min-h-svh flex-col items-center justify-center gap-6 p-6 md:p-10">
-            <div class="flex w-full max-w-sm flex-col gap-2">
-                <a href="{{ route('home') }}" class="flex flex-col items-center gap-2 font-medium" wire:navigate>
-                    <span class="flex h-9 w-9 mb-1 items-center justify-center rounded-md">
-                        <x-app-logo-icon class="size-9 fill-current text-black dark:text-white" />
-                    </span>
-                    <span class="sr-only">{{ config('app.name', 'Laravel') }}</span>
+    <body class="min-h-screen bg-canvas text-ink antialiased">
+        <div class="flex min-h-svh flex-col items-center justify-center gap-6 px-4 py-10">
+            <div class="w-full max-w-[22rem]">
+                <a href="{{ route('home') }}" class="mb-6 inline-flex items-center gap-2 rounded-md text-md font-semibold tracking-[-0.01em] text-ink" wire:navigate>
+                    <x-app-mark class="size-6" />
+                    {{ config('app.name', 'Mail Engine') }}
                 </a>
-                <div class="flex flex-col gap-6">
-                    {{ $slot }}
+                <div class="panel p-6 shadow-overlay">
+                    <div class="flex flex-col gap-6">
+                        {{ $slot }}
+                    </div>
                 </div>
+                <p class="mt-5 text-sm text-ink-subtle">Self-hosted. Your mailbox data stays on this server.</p>
             </div>
         </div>
         @fluxScripts

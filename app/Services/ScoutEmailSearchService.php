@@ -55,12 +55,17 @@ class ScoutEmailSearchService implements EmailSearchService
         return $this->recentQuery($user)->paginate($perPage);
     }
 
+    /**
+     * Result fields are HTML: message text is escaped here and matched terms are
+     * wrapped in `<mark>`, so callers render them as markup without trusting mail
+     * content.
+     */
     public function formatResult(Email $email, ?string $query = null): array
     {
-        $from = $email->from_name ? "{$email->from_name} <{$email->from_address}>" : $email->from_address;
-        $subject = $email->subject ?: '(no subject)';
+        $from = e($email->from_name ? "{$email->from_name} <{$email->from_address}>" : (string) $email->from_address);
+        $subject = e($email->subject ?: '(no subject)');
         $previewSource = $email->body_text ?: strip_tags((string) $email->body_html);
-        $preview = $this->makePreview($previewSource);
+        $preview = e($this->makePreview($previewSource));
 
         if ($query !== null && trim($query) !== '') {
             $from = $this->highlightTerms($from, $query);
@@ -118,9 +123,13 @@ class ScoutEmailSearchService implements EmailSearchService
         );
     }
 
+    /**
+     * Wraps matched terms in `<mark>` inside already-escaped text.
+     */
     protected function highlightTerms(string $text, string $query): string
     {
         $terms = collect(preg_split('/\s+/u', trim($query)) ?: [])
+            ->map(fn (string $term): string => e($term))
             ->filter()
             ->unique()
             ->sortByDesc(fn (string $term): int => mb_strlen($term))

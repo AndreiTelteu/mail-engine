@@ -88,6 +88,42 @@ test('search term highlighting property wraps all term occurrences and preserves
         ->and(str_replace(['<mark>', '</mark>'], '', $highlighted['display']))->toBe($plain['display']);
 });
 
+test('result fields escape mail content so highlights can be rendered as html', function () {
+    $service = new ScoutEmailSearchService;
+    $email = Email::make([
+        'from_address' => 'attacker@example.com',
+        'from_name' => '<script>alert(1)</script>',
+        'subject' => 'Invoice <img src=x onerror=alert(1)>',
+        'body_text' => 'Body with <b>markup</b> and invoice text',
+        'folder' => 'INBOX',
+        'date' => CarbonImmutable::now(),
+    ]);
+
+    $formatted = $service->formatResult($email, 'invoice');
+
+    expect($formatted['from'])->not->toContain('<script>')
+        ->and($formatted['from'])->toContain('&lt;script&gt;')
+        ->and($formatted['subject'])->not->toContain('<img')
+        ->and($formatted['preview'])->not->toContain('<b>')
+        ->and($formatted['subject'])->toContain('<mark>Invoice</mark>')
+        ->and($formatted['preview'])->toContain('<mark>invoice</mark>');
+});
+
+test('highlighting a term with html characters cannot inject markup', function () {
+    $service = new ScoutEmailSearchService;
+    $email = Email::make([
+        'from_address' => 'sender@example.com',
+        'subject' => 'Quarterly <report>',
+        'body_text' => 'The <report> is attached',
+        'folder' => 'INBOX',
+        'date' => CarbonImmutable::now(),
+    ]);
+
+    $formatted = $service->formatResult($email, '<report>');
+
+    expect($formatted['subject'])->toBe('Quarterly <mark>&lt;report&gt;</mark>');
+});
+
 test('folder filtering accuracy property returns only emails from the selected folder', function () {
     // Feature: mail-indexer-searcher, Property 10: Folder Filtering Accuracy
     config(['scout.driver' => null]);

@@ -1,39 +1,410 @@
 @import 'tailwindcss';
-@import '../../vendor/livewire/flux/dist/flux.css';
 
 @source '../views';
 @source '../js';
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 
-@theme {
-    --font-sans: 'Arial Narrow', 'Roboto Condensed', Arial, sans-serif;
-    --font-mono: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
-    --color-utility-paper: #f6f6f0;
-    --color-utility-ink: #121212;
-    --color-utility-muted: #686861;
-    --color-utility-line: #c8c8bd;
-    --color-utility-signal: #fb5a20;
+/*
+ * Runtime theme. Dark is the product default: this is a mail client used for long
+ * sessions in a low-light workspace. Light is a first-class alternate, selected by
+ * the user and stored under the `flux.appearance` key so the Inertia app and the
+ * Flux-rendered auth screens always agree on one preference.
+ */
+:root {
+    color-scheme: dark;
+
+    --app-canvas: #08090b;
+    --app-surface: #101216;
+    --app-raised: #171a1f;
+    --app-hover: #1d2127;
+    --app-active: #24292f;
+    --app-line: #22262c;
+    --app-line-strong: #31363e;
+    --app-ink: #e9ebef;
+    --app-ink-muted: #a4abb8;
+    --app-ink-subtle: #7d848f;
+
+    --app-accent: #2563eb;
+    --app-accent-hover: #3b76f0;
+    --app-accent-ink: #ffffff;
+    --app-accent-text: #9cb8ff;
+    --app-accent-soft: color-mix(in oklab, #2563eb 22%, transparent);
+    --app-accent-line: color-mix(in oklab, #2563eb 55%, transparent);
+
+    --app-positive: #16794a;
+    --app-positive-text: #6ee0a4;
+    --app-positive-soft: color-mix(in oklab, #16794a 26%, transparent);
+    --app-caution: #8a6206;
+    --app-caution-text: #f3c569;
+    --app-caution-soft: color-mix(in oklab, #b5820f 26%, transparent);
+    --app-critical: #b42318;
+    --app-critical-text: #ff9d94;
+    --app-critical-soft: color-mix(in oklab, #b42318 28%, transparent);
+
+    --app-shadow-sm: 0 1px 2px rgb(0 0 0 / 0.55);
+    --app-shadow-md: 0 2px 4px rgb(0 0 0 / 0.4), 0 12px 28px -14px rgb(0 0 0 / 0.75);
+
+    --app-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+:root[data-theme='light'] {
+    color-scheme: light;
+
+    --app-canvas: #f6f7f9;
+    --app-surface: #ffffff;
+    --app-raised: #ffffff;
+    --app-hover: #f1f3f6;
+    --app-active: #e8ebf0;
+    --app-line: #e4e7ec;
+    --app-line-strong: #d0d5dd;
+    --app-ink: #16181d;
+    --app-ink-muted: #576070;
+    --app-ink-subtle: #6b7480;
+
+    --app-accent: #2563eb;
+    --app-accent-hover: #1d4ed8;
+    --app-accent-ink: #ffffff;
+    --app-accent-text: #1d4ed8;
+    --app-accent-soft: color-mix(in oklab, #2563eb 10%, transparent);
+    --app-accent-line: color-mix(in oklab, #2563eb 35%, transparent);
+
+    --app-positive: #087443;
+    --app-positive-text: #086c3f;
+    --app-positive-soft: color-mix(in oklab, #087443 10%, transparent);
+    --app-caution: #a25c00;
+    --app-caution-text: #86500a;
+    --app-caution-soft: color-mix(in oklab, #b5820f 14%, transparent);
+    --app-critical: #c0271b;
+    --app-critical-text: #b42318;
+    --app-critical-soft: color-mix(in oklab, #b42318 9%, transparent);
+
+    --app-shadow-sm: 0 1px 2px rgb(16 24 40 / 0.06);
+    --app-shadow-md: 0 1px 2px rgb(16 24 40 / 0.06), 0 12px 24px -12px rgb(16 24 40 / 0.18);
+}
+
+@theme inline {
+    /*
+     * No webfont: the interface is UI type at 13-14px, where the installed system
+     * face renders best, and a self-hosted mail client should not call out to a
+     * font CDN on every page view.
+     */
+    --font-sans: -apple-system, BlinkMacSystemFont, 'Inter var', 'Inter', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    --font-mono: ui-monospace, 'SFMono-Regular', 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+
+    --text-xs: 0.6875rem;
+    --text-xs--line-height: 1rem;
+    --text-sm: 0.75rem;
+    --text-sm--line-height: 1.125rem;
+    --text-base: 0.8125rem;
+    --text-base--line-height: 1.25rem;
+    --text-md: 0.875rem;
+    --text-md--line-height: 1.375rem;
+    --text-lg: 0.9375rem;
+    --text-lg--line-height: 1.5rem;
+    --text-xl: 1.0625rem;
+    --text-xl--line-height: 1.5rem;
+    --text-2xl: 1.25rem;
+    --text-2xl--line-height: 1.75rem;
+    --text-3xl: 1.75rem;
+    --text-3xl--line-height: 2.125rem;
+
+    --radius-sm: 4px;
+    --radius-md: 6px;
+    --radius-lg: 8px;
+    --radius-xl: 10px;
+    --radius-2xl: 14px;
+
+    --color-canvas: var(--app-canvas);
+    --color-surface: var(--app-surface);
+    --color-raised: var(--app-raised);
+    --color-hover: var(--app-hover);
+    --color-active: var(--app-active);
+    --color-line: var(--app-line);
+    --color-line-strong: var(--app-line-strong);
+    --color-ink: var(--app-ink);
+    --color-ink-muted: var(--app-ink-muted);
+    --color-ink-subtle: var(--app-ink-subtle);
+
+    --color-accent-solid: var(--app-accent);
+    --color-accent-text: var(--app-accent-text);
+    --color-accent-soft: var(--app-accent-soft);
+    --color-accent-line: var(--app-accent-line);
+
+    --color-positive: var(--app-positive);
+    --color-positive-text: var(--app-positive-text);
+    --color-positive-soft: var(--app-positive-soft);
+    --color-caution: var(--app-caution);
+    --color-caution-text: var(--app-caution-text);
+    --color-caution-soft: var(--app-caution-soft);
+    --color-critical: var(--app-critical);
+    --color-critical-text: var(--app-critical-text);
+    --color-critical-soft: var(--app-critical-soft);
+
+    --shadow-panel: var(--app-shadow-sm);
+    --shadow-overlay: var(--app-shadow-md);
+
+    /*
+     * Flux (auth screens) is built on the zinc ramp plus these three accent hooks,
+     * so retinting the ramp is what keeps sign-in inside the same visual world.
+     */
+    --color-accent: var(--app-accent);
+    --color-accent-content: var(--app-accent-text);
+    --color-accent-foreground: var(--app-accent-ink);
+    --color-zinc-50: #f6f7f9;
+    --color-zinc-100: #f1f3f6;
+    --color-zinc-200: #e4e7ec;
+    --color-zinc-300: #d0d5dd;
+    --color-zinc-400: #98a0ad;
+    --color-zinc-500: #7d848f;
+    --color-zinc-600: #576070;
+    --color-zinc-700: #31363e;
+    --color-zinc-800: #22262c;
+    --color-zinc-900: #101216;
+    --color-zinc-950: #08090b;
 }
 
 @layer base {
-    html { background: var(--color-utility-paper); color: var(--color-utility-ink); }
-    body { min-width: 20rem; background: var(--color-utility-paper); }
-    ::selection { background: var(--color-utility-signal); color: var(--color-utility-ink); }
-    :focus-visible { outline: 3px solid var(--color-utility-signal); outline-offset: 3px; }
-    * { scrollbar-color: var(--color-utility-ink) var(--color-utility-paper); }
+    html {
+        background: var(--app-canvas);
+        color: var(--app-ink);
+        -webkit-text-size-adjust: 100%;
+    }
+
+    body {
+        min-width: 20rem;
+        background: var(--app-canvas);
+        color: var(--app-ink);
+        font-family: var(--font-sans);
+        font-size: var(--text-base);
+        line-height: var(--text-base--line-height);
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+    }
+
+    /* Surfaces the browser owns still belong to the design system. */
+    ::selection {
+        background: var(--app-accent-soft);
+        color: var(--app-ink);
+    }
+
+    :focus-visible {
+        outline: 2px solid var(--app-accent);
+        outline-offset: 2px;
+    }
+
+    * {
+        scrollbar-width: thin;
+        scrollbar-color: var(--app-line-strong) transparent;
+    }
+
+    ::-webkit-scrollbar {
+        width: 10px;
+        height: 10px;
+    }
+
+    ::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    ::-webkit-scrollbar-thumb {
+        border: 3px solid transparent;
+        border-radius: 999px;
+        background: var(--app-line-strong);
+        background-clip: content-box;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+        background: var(--app-ink-subtle);
+        background-clip: content-box;
+    }
+
+    time,
+    .tabular {
+        font-variant-numeric: tabular-nums;
+    }
+
+    mark {
+        border-radius: 2px;
+        background: var(--app-accent-soft);
+        color: var(--app-ink);
+        padding: 0 1px;
+    }
+
+    input::placeholder,
+    textarea::placeholder {
+        color: var(--app-ink-subtle);
+    }
+
+    ::-webkit-search-cancel-button {
+        display: none;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+            animation-duration: 0.01ms !important;
+            animation-iteration-count: 1 !important;
+            transition-duration: 0.01ms !important;
+            scroll-behavior: auto !important;
+        }
+    }
 }
 
 @layer components {
-    .utility-grid {
-        background-image: linear-gradient(to right, rgb(18 18 18 / 0.07) 1px, transparent 1px), linear-gradient(to bottom, rgb(18 18 18 / 0.07) 1px, transparent 1px);
-        background-size: 2rem 2rem;
+    .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.375rem;
+        border: 1px solid transparent;
+        border-radius: var(--radius-md);
+        min-height: 2rem;
+        padding: 0 0.625rem;
+        color: var(--app-ink);
+        font-size: var(--text-base);
+        font-weight: 500;
+        line-height: 1;
+        white-space: nowrap;
+        transition:
+            background-color 120ms var(--app-ease),
+            border-color 120ms var(--app-ease),
+            color 120ms var(--app-ease);
     }
-    .utility-stripe { background: repeating-linear-gradient(135deg, var(--color-utility-ink) 0 10px, var(--color-utility-paper) 10px 20px); }
-    .utility-input { width: 100%; border: 1px solid var(--color-utility-ink); border-radius: 0; background: #fff; padding: 0.8rem 0.9rem; color: var(--color-utility-ink); font: 500 0.875rem/1.25 var(--font-sans); }
-    .utility-input::placeholder { color: var(--color-utility-muted); }
-    .utility-input:focus { outline: 3px solid var(--color-utility-signal); outline-offset: -1px; }
-    .utility-button { display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; border: 1px solid var(--color-utility-ink); border-radius: 0; background: var(--color-utility-ink); padding: 0.75rem 1rem; color: var(--color-utility-paper); font-size: 0.75rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; transition: background-color 150ms ease-out, color 150ms ease-out, transform 150ms ease-out; }
-    .utility-button:hover:not(:disabled) { background: var(--color-utility-signal); color: var(--color-utility-ink); transform: translateY(-1px); }
-    .utility-button:disabled { cursor: not-allowed; opacity: 0.45; }
-    .utility-button-secondary { background: transparent; color: var(--color-utility-ink); }
+
+    .btn:disabled,
+    .btn[aria-disabled='true'] {
+        cursor: not-allowed;
+        opacity: 0.55;
+    }
+
+    .btn-primary {
+        border-color: var(--app-accent);
+        background: var(--app-accent);
+        color: var(--app-accent-ink);
+    }
+
+    .btn-primary:hover:not(:disabled) {
+        border-color: var(--app-accent-hover);
+        background: var(--app-accent-hover);
+    }
+
+    .btn-secondary {
+        border-color: var(--app-line-strong);
+        background: var(--app-raised);
+        box-shadow: var(--app-shadow-sm);
+    }
+
+    .btn-secondary:hover:not(:disabled) {
+        background: var(--app-hover);
+    }
+
+    .btn-ghost {
+        color: var(--app-ink-muted);
+    }
+
+    .btn-ghost:hover:not(:disabled) {
+        background: var(--app-hover);
+        color: var(--app-ink);
+    }
+
+    .btn-lg {
+        min-height: 2.25rem;
+        padding: 0 0.875rem;
+        font-size: var(--text-md);
+    }
+
+    .btn-icon {
+        min-width: 2rem;
+        padding: 0;
+    }
+
+    .field-label {
+        display: block;
+        color: var(--app-ink);
+        font-size: var(--text-base);
+        font-weight: 500;
+    }
+
+    .field-input {
+        width: 100%;
+        border: 1px solid var(--app-line-strong);
+        border-radius: var(--radius-md);
+        background: var(--app-raised);
+        min-height: 2.125rem;
+        padding: 0 0.5rem;
+        color: var(--app-ink);
+        font-size: var(--text-base);
+        font-family: inherit;
+        transition:
+            border-color 120ms var(--app-ease),
+            box-shadow 120ms var(--app-ease);
+    }
+
+    .field-input:focus {
+        outline: none;
+        border-color: var(--app-accent);
+        box-shadow: 0 0 0 3px var(--app-accent-soft);
+    }
+
+    .field-input[aria-invalid='true'] {
+        border-color: var(--app-critical);
+    }
+
+    .field-input[aria-invalid='true']:focus {
+        box-shadow: 0 0 0 3px var(--app-critical-soft);
+    }
+
+    .field-input:disabled {
+        cursor: not-allowed;
+        background: var(--app-hover);
+        color: var(--app-ink-subtle);
+    }
+
+    .field-hint {
+        color: var(--app-ink-subtle);
+        font-size: var(--text-sm);
+        line-height: 1.4;
+    }
+
+    .field-error {
+        color: var(--app-critical-text);
+        font-size: var(--text-sm);
+        line-height: 1.4;
+    }
+
+    .panel {
+        border: 1px solid var(--app-line);
+        border-radius: var(--radius-xl);
+        background: var(--app-surface);
+    }
+
+    .chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+        border-radius: 999px;
+        background: var(--app-hover);
+        padding: 0.0625rem 0.375rem;
+        color: var(--app-ink-muted);
+        font-size: var(--text-sm);
+        line-height: 1.25rem;
+        white-space: nowrap;
+    }
+
+    .kbd {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid var(--app-line-strong);
+        border-radius: var(--radius-sm);
+        background: var(--app-raised);
+        min-width: 1.25rem;
+        padding: 0 0.25rem;
+        color: var(--app-ink-muted);
+        font-size: var(--text-xs);
+        font-family: var(--font-mono);
+        line-height: 1.125rem;
+    }
 }
+
