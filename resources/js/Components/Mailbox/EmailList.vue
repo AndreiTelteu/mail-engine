@@ -9,12 +9,13 @@ const props = defineProps({
     emails: { type: Object, required: true },
     selectedId: { type: Number, default: null },
     filtered: { type: Boolean, default: false },
+    emailHref: { type: Function, required: true },
     mailboxConfigured: { type: Boolean, default: false },
     showFolder: { type: Boolean, default: true },
     searching: { type: Boolean, default: false },
 });
 
-const emit = defineEmits(['select', 'reset', 'page']);
+const emit = defineEmits(['reset', 'page']);
 </script>
 
 <template>
@@ -27,9 +28,9 @@ const emit = defineEmits(['select', 'reset', 'page']);
             <li v-for="email in emails.data" :key="email.id">
                 <EmailListItem
                     :email="email"
+                    :href="emailHref(email.id)"
                     :selected="email.id === selectedId"
                     :show-folder="showFolder"
-                    @select="emit('select', $event)"
                 />
             </li>
         </ul>

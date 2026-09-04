@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\ImapSetting;
 use App\Models\SyncSession;
 use App\Models\User;
 use Illuminate\Http\Request;
@@ -70,11 +71,22 @@ class HandleInertiaRequests extends Middleware
     {
         $session = SyncSession::query()
             ->whereBelongsTo($user)
+            ->select([
+                'id',
+                'user_id',
+                'status',
+                'synced_count',
+                'failed_count',
+                'total_to_sync',
+                'completed_at',
+            ])
             ->latest()
             ->first();
 
         return [
-            'configured' => $user->imapSetting()->exists(),
+            'configured' => $user->relationLoaded('imapSetting')
+                ? $user->imapSetting instanceof ImapSetting
+                : $user->imapSetting()->exists(),
             'sync' => $session instanceof SyncSession ? [
                 'status' => $session->status,
                 'isActive' => $session->isActive(),

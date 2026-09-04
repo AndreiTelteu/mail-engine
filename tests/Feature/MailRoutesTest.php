@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\HandleInertiaRequests;
 use App\Models\Email;
 use App\Models\User;
 
@@ -134,6 +135,28 @@ test('authenticated users can select one of their emails in the mailbox workspac
             ->where('filters.email', $email->id)
             ->where('selectedEmail.subject', 'Route detail email')
             ->where('selectedEmail.document', fn (string $document): bool => str_contains($document, 'Route email body')));
+});
+
+test('email prefetch requests only resolve the selected message props', function () {
+    $user = User::factory()->create();
+    $email = createRoutedEmail($user);
+    $assetVersion = app(HandleInertiaRequests::class)->version(request());
+
+    $this->actingAs($user)
+        ->withHeaders([
+            'X-Inertia' => 'true',
+            'X-Inertia-Version' => $assetVersion,
+            'X-Inertia-Partial-Component' => 'Mailbox',
+            'X-Inertia-Partial-Data' => 'filters,selectedEmail',
+        ])
+        ->get(route('emails.index', ['email' => $email->id]))
+        ->assertOk()
+        ->assertJsonPath('component', 'Mailbox')
+        ->assertJsonPath('props.filters.email', $email->id)
+        ->assertJsonPath('props.selectedEmail.subject', 'Route detail email')
+        ->assertJsonMissingPath('props.emails')
+        ->assertJsonMissingPath('props.folders')
+        ->assertJsonMissingPath('props.indexedTotal');
 });
 
 test('authenticated users can open their own email detail page', function () {

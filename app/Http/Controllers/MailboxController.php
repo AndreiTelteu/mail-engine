@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Email;
 use App\Models\User;
 use App\Services\EmailSearchService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Inertia\Inertia;
@@ -28,49 +29,61 @@ class MailboxController extends Controller
         $selectedEmailId = isset($validated['email'])
             ? (int) $validated['email']
             : null;
-        $results = blank($query) && $folder === null
-            ? $searchService->getRecent($user)
-            : $searchService->search($user, $query, $folder);
-        $selectedEmail = $selectedEmailId === null
-            ? null
-            : Email::query()->whereBelongsTo($user)->find($selectedEmailId);
+        $mailboxSummary = null;
+        $getMailboxSummary = function () use (&$mailboxSummary, $user): array {
+            return $mailboxSummary ??= $this->mailboxSummary($user);
+        };
 
         return Inertia::render('Mailbox', [
-            'folders' => $this->folderCounts($user),
-            'indexedTotal' => Email::query()->whereBelongsTo($user)->count(),
+            'folders' => fn (): array => $getMailboxSummary()['folders'],
+            'indexedTotal' => fn (): int => $getMailboxSummary()['total'],
             'filters' => [
                 'query' => $query,
                 'folder' => $folder,
                 'email' => $selectedEmailId,
             ],
-            'selectedEmail' => $selectedEmail instanceof Email
-                ? $this->emailDetail($selectedEmail)
-                : null,
-            'emails' => [
-                'data' => collect($results->items())
-                    ->map(fn (Email $email): array => [
-                        'id' => $email->id,
-                        'attachmentCount' => count($email->attachments ?? []),
-                        ...$searchService->formatResult($email, $query ?: null),
-                    ])
-                    ->values(),
-                'currentPage' => $results->currentPage(),
-                'lastPage' => $results->lastPage(),
-                'total' => $results->total(),
-                'from' => $results->firstItem(),
-                'to' => $results->lastItem(),
-            ],
+            'selectedEmail' => function () use ($selectedEmailId, $user): ?array {
+                if ($selectedEmailId === null) {
+                    return null;
+                }
+
+                $selectedEmail = $this->emailDetailQuery($user)->find($selectedEmailId);
+
+                return $selectedEmail instanceof Email
+                    ? $this->emailDetail($selectedEmail)
+                    : null;
+            },
+            'emails' => function () use ($folder, $query, $searchService, $user): array {
+                $results = blank($query) && $folder === null
+                    ? $searchService->getRecent($user)
+                    : $searchService->search($user, $query, $folder);
+
+                return [
+                    'data' => collect($results->items())
+                        ->map(fn (Email $email): array => [
+                            'id' => $email->id,
+                            'attachmentCount' => count($email->attachments ?? []),
+                            ...$searchService->formatResult($email, $query ?: null),
+                        ])
+                        ->values(),
+                    'currentPage' => $results->currentPage(),
+                    'lastPage' => $results->lastPage(),
+                    'total' => $results->total(),
+                    'from' => $results->firstItem(),
+                    'to' => $results->lastItem(),
+                ];
+            },
         ]);
     }
 
     /**
-     * The user's folders with the number of indexed messages in each.
+     * The user's folder counts and total, computed by one grouped query.
      *
-     * @return Collection<int, array{name: string, count: int}>
+     * @return array{folders: array<int, array{name: string, count: int}>, total: int}
      */
-    private function folderCounts(User $user): Collection
+    private function mailboxSummary(User $user): array
     {
-        return Email::query()
+        $folders = Email::query()
             ->whereBelongsTo($user)
             ->selectRaw('folder, count(*) as aggregate')
             ->groupBy('folder')
@@ -79,16 +92,20 @@ class MailboxController extends Controller
             ->map(fn (Email $email): array => [
                 'name' => $email->folder,
                 'count' => (int) $email->getAttribute('aggregate'),
-            ]);
+            ])
+            ->values();
+
+        return [
+            'folders' => $folders->all(),
+            'total' => $folders->sum('count'),
+        ];
     }
 
     public function show(Request $request, int $emailId): Response
     {
         /** @var User $user */
         $user = $request->user();
-        $email = Email::query()
-            ->whereBelongsTo($user)
-            ->findOrFail($emailId);
+        $email = $this->emailDetailQuery($user)->findOrFail($emailId);
 
         return Inertia::render('Email', ['email' => $this->emailDetail($email)]);
     }
@@ -118,6 +135,26 @@ class MailboxController extends Controller
                 ])
                 ->values(),
         ];
+    }
+
+    private function emailDetailQuery(User $user): Builder
+    {
+        return Email::query()
+            ->whereBelongsTo($user)
+            ->select([
+                'id',
+                'user_id',
+                'folder',
+                'from_address',
+                'from_name',
+                'to_addresses',
+                'cc_addresses',
+                'subject',
+                'date',
+                'body_text',
+                'body_html',
+                'attachments',
+            ]);
     }
 
     /**

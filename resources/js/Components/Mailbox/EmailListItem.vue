@@ -1,14 +1,14 @@
 <script setup>
+import { Link } from '@inertiajs/vue3';
 import { computed } from 'vue';
 import AppIcon from '../AppIcon.vue';
 
 const props = defineProps({
     email: { type: Object, required: true },
+    href: { type: String, required: true },
     selected: { type: Boolean, default: false },
     showFolder: { type: Boolean, default: true },
 });
-
-defineEmits(['select']);
 
 /** Short, absolute time: today shows the clock, older messages show the date. */
 const timestamp = computed(() => {
@@ -40,12 +40,17 @@ const fullTimestamp = computed(() =>
 </script>
 
 <template>
-    <button
-        type="button"
+    <Link
+        :href="href"
+        prefetch
+        cache-for="30s"
+        :only="['filters', 'selectedEmail']"
+        preserve-state
+        preserve-scroll
+        replace
         class="grid w-full gap-1 px-3 py-2.5 text-left transition-colors duration-100"
         :class="selected ? 'bg-accent-soft' : 'hover:bg-hover'"
         :aria-current="selected ? 'true' : undefined"
-        @click="$emit('select', email.id)"
     >
         <span class="flex items-baseline gap-2">
             <!-- Result fields are escaped server-side, with matched terms in <mark>. -->
@@ -69,5 +74,5 @@ const fullTimestamp = computed(() =>
                 <span class="sr-only">{{ email.attachmentCount === 1 ? 'attachment' : 'attachments' }}</span>
             </span>
         </span>
-    </button>
+    </Link>
 </template>

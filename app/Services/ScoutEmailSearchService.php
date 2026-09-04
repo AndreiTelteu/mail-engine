@@ -91,6 +91,7 @@ class ScoutEmailSearchService implements EmailSearchService
     protected function fallbackSearch(User $user, string $query, ?string $folder, int $perPage): LengthAwarePaginator
     {
         return Email::query()
+            ->select($this->resultColumns())
             ->whereBelongsTo($user)
             ->when($folder !== null, fn ($emailQuery) => $emailQuery->where('folder', $folder))
             ->where(function ($emailQuery) use ($query): void {
@@ -110,9 +111,29 @@ class ScoutEmailSearchService implements EmailSearchService
     protected function recentQuery(User $user, ?string $folder = null)
     {
         return Email::query()
+            ->select($this->resultColumns())
             ->whereBelongsTo($user)
             ->when($folder !== null, fn ($emailQuery) => $emailQuery->where('folder', $folder))
             ->orderByDesc('date');
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    protected function resultColumns(): array
+    {
+        return [
+            'id',
+            'user_id',
+            'folder',
+            'from_address',
+            'from_name',
+            'subject',
+            'date',
+            'body_text',
+            'body_html',
+            'attachments',
+        ];
     }
 
     protected function makePreview(?string $text): string

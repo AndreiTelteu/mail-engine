@@ -21,6 +21,8 @@ const current = computed(() => items.find((item) => item.match.test(page.url))?.
             <li v-for="item in items" :key="item.href">
                 <Link
                     :href="item.href"
+                    :prefetch="current === item.href ? false : 'mount'"
+                    cache-for="1m"
                     :aria-current="current === item.href ? 'page' : undefined"
                     class="group flex items-center gap-2 rounded-md px-2 py-1.5 font-medium transition-colors duration-100"
                     :class="

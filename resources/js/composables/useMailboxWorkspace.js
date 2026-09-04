@@ -48,6 +48,25 @@ export function useMailboxWorkspace(props) {
 
     const selectFolder = (folder) => visit({ folder: folder || undefined, page: undefined });
     const selectEmail = (id) => visit({ email: id });
+    const emailHref = (id) => {
+        const parameters = new URLSearchParams();
+
+        if (query.value) {
+            parameters.set('query', query.value);
+        }
+
+        if (props.filters.folder) {
+            parameters.set('folder', props.filters.folder);
+        }
+
+        parameters.set('email', id);
+
+        if (props.emails.currentPage > 1) {
+            parameters.set('page', props.emails.currentPage);
+        }
+
+        return `${routes.mailbox}?${parameters.toString()}`;
+    };
     const closeEmail = () => visit({ email: undefined });
     const goToPage = (page) => visit({ page: page > 1 ? page : undefined });
 
@@ -132,7 +151,7 @@ export function useMailboxWorkspace(props) {
         searchField,
         isFiltered: computed(() => Boolean(props.filters.query || props.filters.folder)),
         selectFolder,
-        selectEmail,
+        emailHref,
         closeEmail,
         goToPage,
         reset,

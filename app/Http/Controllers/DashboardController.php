@@ -19,9 +19,15 @@ class DashboardController extends Controller
     {
         /** @var User $user */
         $user = $request->user();
-        $emails = Email::query()->whereBelongsTo($user);
-
-        $setting = $user->imapSetting;
+        $index = Email::query()
+            ->whereBelongsTo($user)
+            ->selectRaw('COUNT(*) as messages')
+            ->selectRaw('COUNT(DISTINCT folder) as folders')
+            ->selectRaw('MAX(date) as newest_message_at')
+            ->selectRaw('SUM(CASE WHEN indexing_failed_at IS NOT NULL THEN 1 ELSE 0 END) as failed_count')
+            ->first();
+        $setting = $user->imapSetting()->first();
+        $user->setRelation('imapSetting', $setting);
 
         return Inertia::render('Dashboard', [
             'connection' => $setting instanceof ImapSetting ? [
@@ -32,10 +38,10 @@ class DashboardController extends Controller
                 'isActive' => $setting->is_active,
             ] : null,
             'index' => [
-                'messages' => (clone $emails)->count(),
-                'folders' => (clone $emails)->distinct()->count('folder'),
-                'newestMessageAt' => $this->formatTimestamp((clone $emails)->max('date')),
-                'failedCount' => (clone $emails)->whereNotNull('indexing_failed_at')->count(),
+                'messages' => (int) $index?->getAttribute('messages'),
+                'folders' => (int) $index?->getAttribute('folders'),
+                'newestMessageAt' => $this->formatTimestamp($index?->getAttribute('newest_message_at')),
+                'failedCount' => (int) $index?->getAttribute('failed_count'),
             ],
             'recentFolders' => Email::query()
                 ->whereBelongsTo($user)

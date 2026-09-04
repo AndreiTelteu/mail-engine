@@ -27,7 +27,7 @@ const {
     searchField,
     isFiltered,
     selectFolder,
-    selectEmail,
+    emailHref,
     closeEmail,
     goToPage,
     reset,
@@ -70,12 +70,12 @@ const {
 
                 <EmailList
                     :emails="emails"
+                    :email-href="emailHref"
                     :selected-id="filters.email"
                     :filtered="isFiltered"
                     :mailbox-configured="mailboxConfigured"
                     :show-folder="! filters.folder"
                     :searching="searching"
-                    @select="selectEmail"
                     @reset="reset"
                     @page="goToPage"
                 />
