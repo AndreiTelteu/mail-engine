@@ -3,6 +3,7 @@
 namespace App\Livewire;
 
 use App\Models\Email;
+use App\Services\EmailHtmlDocumentService;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
 
@@ -34,7 +35,10 @@ class EmailModalComponent extends Component
             ->whereBelongsTo(Auth::user())
             ->findOrFail($emailId);
 
-        $this->iframeDocument = $this->buildIframeDocument($this->email);
+        $this->iframeDocument = app(EmailHtmlDocumentService::class)->build(
+            $this->email->body_html,
+            $this->email->body_text,
+        );
         $this->show = true;
     }
 
@@ -58,64 +62,6 @@ class EmailModalComponent extends Component
         }
 
         $this->dispatch('open-email-in-new-tab', url: route('emails.show', ['emailId' => $this->email->id]));
-    }
-
-    protected function buildIframeDocument(Email $email): string
-    {
-        if (filled($email->body_html)) {
-            return $this->wrapEmailHtmlDocument($email->body_html);
-        }
-
-        $plainTextBody = e($email->body_text ?? '');
-
-        return $this->wrapEmailHtmlDocument(<<<HTML
-<pre style="margin:0; white-space:pre-wrap; word-break:break-word; font:14px/1.6 Arial, Helvetica, sans-serif; color:#111827;">{$plainTextBody}</pre>
-HTML);
-    }
-
-    protected function wrapEmailHtmlDocument(string $content): string
-    {
-        $trimmedContent = trim($content);
-
-        if ($trimmedContent === '') {
-            return <<<'HTML'
-<!DOCTYPE html>
-<html>
-    <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-    </head>
-    <body></body>
-</html>
-HTML;
-        }
-
-        if (preg_match('/<(?:!DOCTYPE|html|body)\b/i', $trimmedContent) === 1) {
-            return $trimmedContent;
-        }
-
-        return <<<HTML
-<!DOCTYPE html>
-<html>
-    <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <base target="_blank">
-        <style>
-            html, body {
-                margin: 0;
-                padding: 0;
-                background: #ffffff;
-            }
-
-            img, table {
-                max-width: 100%;
-            }
-        </style>
-    </head>
-    <body>{$trimmedContent}</body>
-</html>
-HTML;
     }
 
     public function render()

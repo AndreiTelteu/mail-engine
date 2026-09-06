@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'folder_stats',
     'total_remote_count',
     'total_to_sync',
+    'pending_folder_jobs',
     'synced_count',
     'failed_count',
     'started_at',
@@ -26,6 +27,7 @@ class SyncSession extends Model
             'folder_stats' => 'array',
             'total_remote_count' => 'integer',
             'total_to_sync' => 'integer',
+            'pending_folder_jobs' => 'integer',
             'synced_count' => 'integer',
             'failed_count' => 'integer',
             'started_at' => 'datetime',
@@ -54,9 +56,9 @@ class SyncSession extends Model
             return;
         }
 
-        if (($this->synced_count + $this->failed_count) >= $this->total_to_sync) {
+        if ($this->pending_folder_jobs === 0) {
             $this->update([
-                'status' => 'completed',
+                'status' => $this->failed_count > 0 ? 'failed' : 'completed',
                 'completed_at' => now(),
             ]);
         }

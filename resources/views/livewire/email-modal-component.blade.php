@@ -125,7 +125,7 @@
                                 x-ref="emailFrame"
                                 @load="syncEmailFrameHeight()"
                                 class="block min-h-[30rem] w-full bg-white"
-                                sandbox="allow-popups allow-popups-to-escape-sandbox allow-same-origin"
+                                sandbox="allow-popups allow-popups-to-escape-sandbox"
                                 referrerpolicy="no-referrer"
                                 srcdoc="{{ $iframeDocument }}"
                                 title="{{ $email->subject ?: __('Email content') }}"

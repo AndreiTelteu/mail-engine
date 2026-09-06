@@ -47,7 +47,7 @@
         "index": [
             "Composer\\Config::disableProcessTimeout",
             "php artisan mail:typesense:init --fresh",
-            "php artisan scout:import Email"
+            "php artisan mail:reset-and-import --force"
         ],
         "setup": [
             "composer install",

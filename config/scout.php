@@ -74,12 +74,39 @@ return [
                             'optional' => true,
                         ],
                         [
+                            'name' => 'to_addresses',
+                            'type' => 'string[]',
+                            'optional' => true,
+                        ],
+                        [
+                            'name' => 'cc_addresses',
+                            'type' => 'string[]',
+                            'optional' => true,
+                        ],
+                        [
                             'name' => 'subject',
                             'type' => 'string',
                         ],
                         [
-                            'name' => 'body_text',
+                            'name' => 'body_current',
                             'type' => 'string',
+                        ],
+                        [
+                            'name' => 'body_quoted',
+                            'type' => 'string',
+                        ],
+                        [
+                            'name' => 'preview',
+                            'type' => 'string',
+                        ],
+                        [
+                            'name' => 'attachment_names',
+                            'type' => 'string[]',
+                            'optional' => true,
+                        ],
+                        [
+                            'name' => 'attachment_count',
+                            'type' => 'int32',
                         ],
                         [
                             'name' => 'folder',
@@ -94,7 +121,13 @@ return [
                     'default_sorting_field' => 'date',
                 ],
                 'search-parameters' => [
-                    'query_by' => 'subject,from_address,from_name,body_text,folder',
+                    'query_by' => 'subject,from_name,from_address,to_addresses,cc_addresses,attachment_names,body_current,body_quoted,preview',
+                    'query_by_weights' => '10,8,8,5,5,5,4,1,1',
+                    'prefix' => 'true,true,true,true,true,true,false,false,false',
+                    'highlight_fields' => 'subject,from_name,from_address,body_current,body_quoted,preview',
+                    'highlight_affix_num_tokens' => 8,
+                    'snippet_threshold' => 30,
+                    'sort_by' => '_text_match:desc,date:desc',
                 ],
             ],
         ],

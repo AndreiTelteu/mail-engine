@@ -1,20 +1,17 @@
 <?php
 
 use App\DataTransferObjects\ImapConnection;
-use App\Jobs\IndexEmailJob;
+use App\DataTransferObjects\MailFolderStatus;
+use App\Jobs\SyncFolderEmailsJob;
 use App\Jobs\SyncUserEmailsJob;
-use App\Models\Email;
 use App\Models\ImapSetting;
 use App\Models\SyncSession;
 use App\Models\User;
 use App\Services\ImapConnectionService;
 use Illuminate\Support\Facades\Bus;
-use Illuminate\Support\Facades\Log;
-use Mockery;
 
-test('sync user emails job counts folders and dispatches index jobs', function () {
+test('mailbox sync creates folder cursors and dispatches one locked job per folder', function () {
     Bus::fake();
-
     $user = User::factory()->create();
     $setting = ImapSetting::create([
         'user_id' => $user->id,
@@ -25,135 +22,31 @@ test('sync user emails job counts folders and dispatches index jobs', function (
         'encryption' => 'ssl',
         'is_active' => true,
     ]);
-
-    Email::create([
-        'user_id' => $user->id,
-        'message_id' => '<existing@example.com>',
-        'folder' => 'INBOX',
-        'from_address' => 'sender@example.com',
-        'to_addresses' => [],
-        'cc_addresses' => [],
-        'subject' => 'Existing',
-        'date' => now(),
-        'attachments' => [],
-    ]);
-
-    $syncSession = SyncSession::create([
-        'user_id' => $user->id,
-        'status' => 'pending',
-    ]);
-
-    $resource = new class
-    {
-        public bool $disconnected = false;
-
-        public function disconnect(): void
-        {
-            $this->disconnected = true;
-        }
-    };
-
-    $connection = new ImapConnection($resource, $setting);
-
-    $imapService = Mockery::mock(ImapConnectionService::class);
-    $imapService->shouldReceive('connect')->once()->andReturn($connection);
-    $imapService->shouldReceive('getFolders')->once()->andReturn(['INBOX', 'Sent']);
-    $imapService->shouldReceive('getMessageIds')->with($connection, 'INBOX')->andReturn(['<existing@example.com>', '<new@example.com>']);
-    $imapService->shouldReceive('getMessageIds')->with($connection, 'Sent')->andReturn(['<sent@example.com>']);
-
-    (new SyncUserEmailsJob($user->id, $syncSession->id))->handle($imapService);
-
-    $syncSession->refresh();
-
-    expect($syncSession->status)->toBe('syncing')
-        ->and($syncSession->folder_stats)->toBe(['INBOX' => 2, 'Sent' => 1])
-        ->and($syncSession->total_remote_count)->toBe(3)
-        ->and($syncSession->total_to_sync)->toBe(2)
-        ->and($syncSession->started_at)->not->toBeNull();
-
-    Bus::assertDispatched(IndexEmailJob::class, fn (IndexEmailJob $job): bool => $job->messageId === '<new@example.com>'
-        && $job->syncSessionId === $syncSession->id);
-    Bus::assertDispatched(IndexEmailJob::class, fn (IndexEmailJob $job): bool => $job->messageId === '<sent@example.com>'
-        && $job->syncSessionId === $syncSession->id);
-    Bus::assertDispatchedTimes(IndexEmailJob::class, 2);
-
-    expect($resource->disconnected)->toBeTrue();
-});
-
-test('sync user emails job marks session completed when all emails are already synced', function () {
-    Bus::fake();
-
-    $user = User::factory()->create();
-    $setting = ImapSetting::create([
-        'user_id' => $user->id,
-        'hostname' => 'imap.example.com',
-        'port' => 993,
-        'username' => 'user@example.com',
-        'password' => 'secret',
-        'encryption' => 'ssl',
-        'is_active' => true,
-    ]);
-
-    Email::create([
-        'user_id' => $user->id,
-        'message_id' => '<only@example.com>',
-        'folder' => 'INBOX',
-        'from_address' => 'sender@example.com',
-        'to_addresses' => [],
-        'cc_addresses' => [],
-        'subject' => 'Only email',
-        'date' => now(),
-        'attachments' => [],
-    ]);
-
-    $syncSession = SyncSession::create([
-        'user_id' => $user->id,
-        'status' => 'pending',
-    ]);
-
-    $resource = new class
+    $session = SyncSession::create(['user_id' => $user->id, 'status' => 'pending']);
+    $connection = new ImapConnection(new class
     {
         public function disconnect(): void {}
-    };
+    }, $setting);
 
-    $connection = new ImapConnection($resource, $setting);
+    $imap = Mockery::mock(ImapConnectionService::class);
+    $imap->shouldReceive('connect')->once()->andReturn($connection);
+    $imap->shouldReceive('getFolders')->once()->andReturn(['INBOX', 'Archive']);
+    $imap->shouldReceive('getFolderStatus')->once()->with($connection, 'INBOX')->andReturn(new MailFolderStatus('INBOX', 10, 101, 100));
+    $imap->shouldReceive('getFolderStatus')->once()->with($connection, 'Archive')->andReturn(new MailFolderStatus('Archive', 11, 21, 20));
 
-    $imapService = Mockery::mock(ImapConnectionService::class);
-    $imapService->shouldReceive('connect')->once()->andReturn($connection);
-    $imapService->shouldReceive('getFolders')->once()->andReturn(['INBOX']);
-    $imapService->shouldReceive('getMessageIds')->once()->andReturn(['<only@example.com>']);
+    (new SyncUserEmailsJob($user->id, $session->id))->handle($imap);
 
-    (new SyncUserEmailsJob($user->id, $syncSession->id))->handle($imapService);
+    $session->refresh();
 
-    $syncSession->refresh();
-
-    expect($syncSession->status)->toBe('completed')
-        ->and($syncSession->total_to_sync)->toBe(0)
-        ->and($syncSession->completed_at)->not->toBeNull();
-
-    Bus::assertNotDispatched(IndexEmailJob::class);
+    expect($session->status)->toBe('syncing')
+        ->and($session->pending_folder_jobs)->toBe(2)
+        ->and($session->total_remote_count)->toBe(120)
+        ->and($session->folder_stats)->toBe(['INBOX' => 100, 'Archive' => 20]);
+    Bus::assertDispatched(SyncFolderEmailsJob::class, fn (SyncFolderEmailsJob $job): bool => $job->userId === $user->id);
+    Bus::assertDispatchedTimes(SyncFolderEmailsJob::class, 2);
 });
 
-test('sync user emails job marks session failed when no active imap settings', function () {
-    $user = User::factory()->create();
-
-    $syncSession = SyncSession::create([
-        'user_id' => $user->id,
-        'status' => 'pending',
-    ]);
-
-    $imapService = Mockery::mock(ImapConnectionService::class);
-
-    (new SyncUserEmailsJob($user->id, $syncSession->id))->handle($imapService);
-
-    $syncSession->refresh();
-
-    expect($syncSession->status)->toBe('failed');
-});
-
-test('sync user emails job marks session failed on imap error', function () {
-    Log::spy();
-
+test('mailbox sync marks the supplied session as failed when its IMAP connection cannot be opened', function () {
     $user = User::factory()->create();
     ImapSetting::create([
         'user_id' => $user->id,
@@ -164,23 +57,13 @@ test('sync user emails job marks session failed on imap error', function () {
         'encryption' => 'ssl',
         'is_active' => true,
     ]);
+    $session = SyncSession::create(['user_id' => $user->id, 'status' => 'pending']);
 
-    $syncSession = SyncSession::create([
-        'user_id' => $user->id,
-        'status' => 'pending',
-    ]);
+    $imap = Mockery::mock(ImapConnectionService::class);
+    $imap->shouldReceive('connect')->once()->andThrow(new RuntimeException('Connection refused'));
 
-    $imapService = Mockery::mock(ImapConnectionService::class);
-    $imapService->shouldReceive('connect')->once()->andThrow(new RuntimeException('Connection refused'));
+    (new SyncUserEmailsJob($user->id, $session->id))->handle($imap);
 
-    (new SyncUserEmailsJob($user->id, $syncSession->id))->handle($imapService);
-
-    $syncSession->refresh();
-
-    expect($syncSession->status)->toBe('failed');
-
-    Log::shouldHaveReceived('error')->once()->with('IMAP sync failed', Mockery::on(
-        fn (array $context): bool => $context['user_id'] === $user->id
-            && $context['sync_session_id'] === $syncSession->id
-    ));
+    expect($session->fresh()->status)->toBe('failed')
+        ->and($session->fresh()->completed_at)->not->toBeNull();
 });

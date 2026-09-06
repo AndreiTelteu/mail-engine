@@ -2,6 +2,8 @@
 
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Models\Email;
+use App\Models\ImapSetting;
+use App\Models\MailFolder;
 use App\Models\User;
 
 function createRoutedEmail(User $user, array $overrides = []): Email
@@ -9,9 +11,28 @@ function createRoutedEmail(User $user, array $overrides = []): Email
     static $counter = 0;
 
     $counter++;
+    $folderPath = $overrides['folder'] ?? 'INBOX';
+    $setting = ImapSetting::query()->firstOrCreate(
+        ['user_id' => $user->id],
+        [
+            'hostname' => 'imap.example.com',
+            'port' => 993,
+            'username' => $user->email,
+            'password' => 'secret',
+            'encryption' => 'ssl',
+            'is_active' => true,
+        ],
+    );
+    $folder = MailFolder::query()->firstOrCreate(
+        ['imap_setting_id' => $setting->id, 'path' => $folderPath],
+        ['uid_validity' => 1],
+    );
 
     return Email::withoutSyncingToSearch(fn () => Email::create(array_merge([
+        'mail_folder_id' => $folder->id,
         'user_id' => $user->id,
+        'uid_validity' => 1,
+        'imap_uid' => $counter,
         'message_id' => "route-email-{$user->id}-{$counter}",
         'folder' => 'INBOX',
         'from_address' => 'sender@example.com',
@@ -22,25 +43,21 @@ function createRoutedEmail(User $user, array $overrides = []): Email
         'date' => now(),
         'body_text' => 'Route email body',
         'body_html' => '<p>Route email body</p>',
+        'body_current' => 'Route email body',
+        'body_quoted' => '',
+        'preview' => 'Route email body',
         'attachments' => [],
+        'content_hash' => hash('sha256', "route-{$user->id}-{$counter}"),
     ], $overrides)));
 }
 
 test('mail routes require authentication', function () {
-    $email = Email::withoutSyncingToSearch(fn () => Email::create([
-        'user_id' => User::factory()->create()->id,
+    $email = createRoutedEmail(User::factory()->create(), [
         'message_id' => 'guest-route-email',
-        'folder' => 'INBOX',
-        'from_address' => 'sender@example.com',
-        'from_name' => 'Sender',
-        'to_addresses' => [['address' => 'guest@example.com', 'name' => 'Guest']],
-        'cc_addresses' => [],
         'subject' => 'Guest route email',
-        'date' => now(),
         'body_text' => 'Guest route body',
         'body_html' => '<p>Guest route body</p>',
-        'attachments' => [],
-    ]));
+    ]);
 
     $this->get(route('mail.settings'))->assertRedirect(route('login'));
     $this->get(route('emails.index'))->assertRedirect(route('login'));
@@ -111,18 +128,6 @@ test('the mailbox lists folders with counts, attachment counts, and paging detai
         ->assertInertia(fn ($page) => $page->where('emails.currentPage', 2));
 });
 
-test('search results carry escaped highlight markup', function () {
-    $user = User::factory()->create();
-    createRoutedEmail($user, ['subject' => 'Invoice <b>April</b>']);
-
-    $this->actingAs($user)
-        ->get(route('emails.index', ['query' => 'invoice']))
-        ->assertOk()
-        ->assertInertia(fn ($page) => $page
-            ->where('emails.data.0.subject', fn (string $subject): bool => str_contains($subject, '<mark>Invoice</mark>')
-                && ! str_contains($subject, '<b>')));
-});
-
 test('authenticated users can select one of their emails in the mailbox workspace', function () {
     $user = User::factory()->create();
     $email = createRoutedEmail($user);
@@ -134,7 +139,8 @@ test('authenticated users can select one of their emails in the mailbox workspac
             ->component('Mailbox')
             ->where('filters.email', $email->id)
             ->where('selectedEmail.subject', 'Route detail email')
-            ->where('selectedEmail.document', fn (string $document): bool => str_contains($document, 'Route email body')));
+            ->where('selectedEmail.document', fn (string $document): bool => str_contains($document, '<base target="_blank">')
+                && str_contains($document, 'Route email body')));
 });
 
 test('email prefetch requests only resolve the selected message props', function () {

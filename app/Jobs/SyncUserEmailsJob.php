@@ -2,12 +2,13 @@
 
 namespace App\Jobs;
 
-use App\Models\Email;
 use App\Models\ImapSetting;
+use App\Models\MailFolder;
 use App\Models\SyncSession;
 use App\Models\User;
 use App\Services\ImapConnectionService;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -15,14 +16,30 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 
-class SyncUserEmailsJob implements ShouldQueue
+class SyncUserEmailsJob implements ShouldBeUnique, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public function __construct(
         public int $userId,
-        public int $syncSessionId,
+        public ?int $syncSessionId = null,
     ) {}
+
+    public int $tries = 3;
+
+    public int $timeout = 180;
+
+    public int $uniqueFor = 1200;
+
+    /**
+     * @var array<int, int>
+     */
+    public array $backoff = [60, 180, 600];
+
+    public function uniqueId(): string
+    {
+        return (string) $this->userId;
+    }
 
     public function handle(ImapConnectionService $imapService): void
     {
@@ -32,11 +49,7 @@ class SyncUserEmailsJob implements ShouldQueue
             throw (new ModelNotFoundException)->setModel(User::class, [$this->userId]);
         }
 
-        $syncSession = SyncSession::query()->find($this->syncSessionId);
-
-        if (! $syncSession instanceof SyncSession) {
-            throw (new ModelNotFoundException)->setModel(SyncSession::class, [$this->syncSessionId]);
-        }
+        $syncSession = $this->syncSession($user);
 
         $setting = ImapSetting::query()
             ->whereBelongsTo($user)
@@ -44,7 +57,7 @@ class SyncUserEmailsJob implements ShouldQueue
             ->first();
 
         if (! $setting instanceof ImapSetting) {
-            $syncSession->update(['status' => 'failed']);
+            $syncSession->update(['status' => 'failed', 'completed_at' => now()]);
 
             return;
         }
@@ -58,53 +71,62 @@ class SyncUserEmailsJob implements ShouldQueue
 
         try {
             $connection = $imapService->connect($setting);
-            $folderStats = [];
-            $totalRemoteCount = 0;
-            $totalToSync = 0;
+            $folderStats = collect($imapService->getFolders($connection))
+                ->mapWithKeys(function (string $folder) use ($connection, $imapService): array {
+                    $status = $imapService->getFolderStatus($connection, $folder);
 
-            $folders = $imapService->getFolders($connection);
-
-            foreach ($folders as $folder) {
-                $imapMessageIds = $imapService->getMessageIds($connection, $folder);
-                $folderCount = count($imapMessageIds);
-                $folderStats[$folder] = $folderCount;
-                $totalRemoteCount += $folderCount;
-
-                $indexedMessageIds = Email::query()
-                    ->whereBelongsTo($user)
-                    ->whereIn('message_id', $imapMessageIds)
-                    ->pluck('message_id')
-                    ->all();
-
-                $unindexed = array_values(array_diff(
-                    array_values(array_unique($imapMessageIds)),
-                    array_values(array_unique($indexedMessageIds)),
-                ));
-
-                $totalToSync += count($unindexed);
-
-                foreach ($unindexed as $messageId) {
-                    IndexEmailJob::dispatch($user->id, $messageId, $folder, $this->syncSessionId);
-                }
-            }
+                    return [$folder => $status];
+                });
+            $mailFolders = $folderStats
+                ->map(function ($status) use ($setting): MailFolder {
+                    return MailFolder::query()->firstOrCreate(
+                        ['imap_setting_id' => $setting->id, 'path' => $status->path],
+                        [
+                            'uid_validity' => $status->uidValidity,
+                            'uid_next' => $status->uidNext,
+                            'remote_message_count' => $status->messageCount,
+                        ],
+                    );
+                })
+                ->values();
 
             $syncSession->update([
-                'folder_stats' => $folderStats,
-                'total_remote_count' => $totalRemoteCount,
-                'total_to_sync' => $totalToSync,
-                'status' => $totalToSync > 0 ? 'syncing' : 'completed',
-                'completed_at' => $totalToSync === 0 ? now() : null,
+                'folder_stats' => $folderStats->map(fn ($status): int => $status->messageCount)->all(),
+                'total_remote_count' => $folderStats->sum(fn ($status): int => $status->messageCount),
+                'total_to_sync' => 0,
+                'synced_count' => 0,
+                'failed_count' => 0,
+                'pending_folder_jobs' => $mailFolders->count(),
+                'status' => $mailFolders->isNotEmpty() ? 'syncing' : 'completed',
+                'completed_at' => $mailFolders->isEmpty() ? now() : null,
             ]);
+
+            foreach ($mailFolders as $mailFolder) {
+                SyncFolderEmailsJob::dispatch($user->id, $mailFolder->id, $syncSession->id);
+            }
         } catch (\Throwable $exception) {
-            $syncSession->update(['status' => 'failed']);
+            $syncSession->update(['status' => 'failed', 'completed_at' => now()]);
 
             Log::error('IMAP sync failed', [
                 'user_id' => $this->userId,
-                'sync_session_id' => $this->syncSessionId,
+                'sync_session_id' => $syncSession->id,
                 'error' => $exception->getMessage(),
             ]);
         } finally {
             $connection?->disconnect();
         }
+    }
+
+    private function syncSession(User $user): SyncSession
+    {
+        if ($this->syncSessionId !== null) {
+            $session = SyncSession::query()->find($this->syncSessionId);
+
+            if ($session instanceof SyncSession) {
+                return $session;
+            }
+        }
+
+        return SyncSession::create(['user_id' => $user->id, 'status' => 'pending']);
     }
 }

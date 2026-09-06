@@ -2,7 +2,10 @@
 
 use App\Livewire\EmailModalComponent;
 use App\Models\Email;
+use App\Models\ImapSetting;
+use App\Models\MailFolder;
 use App\Models\User;
+use App\Services\EmailHtmlDocumentService;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Livewire\Livewire;
 
@@ -11,9 +14,26 @@ function createModalEmail(User $user, array $overrides = []): Email
     static $counter = 0;
 
     $counter++;
+    $imapSetting = ImapSetting::query()->create([
+        'user_id' => $user->id,
+        'hostname' => 'imap.example.com',
+        'port' => 993,
+        'username' => $user->email,
+        'password' => 'secret',
+        'encryption' => 'ssl',
+        'is_active' => true,
+    ]);
+    $mailFolder = MailFolder::query()->create([
+        'imap_setting_id' => $imapSetting->id,
+        'path' => 'INBOX',
+        'uid_validity' => 1,
+    ]);
 
     return Email::withoutSyncingToSearch(fn () => Email::create(array_merge([
+        'mail_folder_id' => $mailFolder->id,
         'user_id' => $user->id,
+        'uid_validity' => 1,
+        'imap_uid' => $counter,
         'message_id' => "modal-message-{$user->id}-{$counter}",
         'folder' => 'INBOX',
         'from_address' => 'sender@example.com',
@@ -24,10 +44,16 @@ function createModalEmail(User $user, array $overrides = []): Email
         'date' => now(),
         'body_text' => 'Fallback body',
         'body_html' => '<div><strong>Safe content</strong><script>alert(1)</script><a href="javascript:alert(2)" onclick="alert(3)">link</a></div>',
+        'body_current' => 'Safe content link',
+        'body_quoted' => '',
+        'preview' => 'Safe content link',
         'attachments' => [
             ['filename' => 'report.pdf', 'filetype' => 'application/pdf'],
             ['filename' => 'notes.txt', 'filetype' => 'text/plain'],
         ],
+        'attachment_count' => 2,
+        'content_hash' => hash('sha256', "modal-email-{$user->id}-{$counter}"),
+        'parser_version' => 1,
     ], $overrides)));
 }
 
@@ -40,13 +66,15 @@ test('email modal opens and renders the email inside a sandboxed iframe', functi
     Livewire::test(EmailModalComponent::class)
         ->call('open', $email->id)
         ->assertSet('show', true)
-        ->assertSet('iframeDocument', fn (string $document): bool => str_contains($document, '<script>alert(1)</script>')
-            && str_contains($document, 'javascript:alert(2)'))
+        ->assertSet('iframeDocument', fn (string $document): bool => str_contains($document, '<base target="_blank">')
+            && ! str_contains($document, '<script>alert(1)</script>')
+            && ! str_contains($document, 'javascript:alert(2)')
+            && ! str_contains($document, 'onclick='))
         ->assertSee('Modal email')
         ->assertSee('sender@example.com')
         ->assertSee('2 attachments')
         ->assertSee('report.pdf')
-        ->assertSeeHtml('sandbox="allow-popups allow-popups-to-escape-sandbox allow-same-origin"')
+        ->assertSeeHtml('sandbox="allow-popups allow-popups-to-escape-sandbox"')
         ->assertSeeHtml('referrerpolicy="no-referrer"')
         ->assertSeeHtml('srcdoc="');
 });
@@ -100,19 +128,11 @@ test('open in new tab dispatches an event', function () {
 });
 
 test('plain text emails are wrapped into an iframe document', function () {
-    $component = app(EmailModalComponent::class);
-    $reflection = new ReflectionMethod($component, 'buildIframeDocument');
-    $reflection->setAccessible(true);
-
-    $email = createModalEmail(User::factory()->create(), [
-        'body_html' => null,
-        'body_text' => "Line one\nLine two",
-    ]);
-
-    $document = $reflection->invoke($component, $email);
+    $document = app(EmailHtmlDocumentService::class)->build(null, "Line one\nLine two");
 
     expect($document)
-        ->toContain('<pre style=')
+        ->toContain('<base target="_blank">')
+        ->toContain('<pre>')
         ->toContain('Line one')
         ->toContain('Line two');
 });

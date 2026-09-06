@@ -3,102 +3,113 @@
 namespace App\Services;
 
 use App\DataTransferObjects\EmailData;
-use App\DataTransferObjects\ImapConnection;
 use App\Exceptions\Imap\IndexingException;
 use App\Models\Email;
+use App\Models\MailFolder;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Throwable;
 
 class DatabaseEmailIndexingService implements EmailIndexingService
 {
     public function __construct(
-        protected ImapConnectionService $imapConnectionService,
+        protected EmailContentProcessor $contentProcessor,
     ) {}
 
-    public function indexEmail(
+    /**
+     * @param  array<int, EmailData>  $emails
+     * @return Collection<int, Email>
+     */
+    public function indexEmails(
         User $user,
-        string $messageId,
-        string $folder,
-        ImapConnection $connection,
-    ): Email {
-        $existing = Email::query()
-            ->whereBelongsTo($user)
-            ->where('message_id', $messageId)
-            ->first();
-
-        if ($existing !== null) {
-            if ($existing->indexing_failed_at !== null) {
-                $existing->forceFill([
-                    'indexing_failed_at' => null,
-                    'indexing_error' => null,
-                ])->save();
-            }
-
-            return $existing;
+        MailFolder $mailFolder,
+        array $emails,
+    ): Collection {
+        if ($emails === []) {
+            return new Collection;
         }
 
-        $emailData = $this->extractEmailData($connection, $messageId);
-
         try {
-            return DB::transaction(function () use ($emailData, $folder, $messageId, $user): Email {
-                return Email::query()->firstOrCreate(
-                    [
-                        'user_id' => $user->id,
-                        'message_id' => $messageId,
-                    ],
-                    [
-                        'folder' => $folder,
-                        'from_address' => $emailData->fromAddress,
-                        'from_name' => $emailData->fromName,
-                        'to_addresses' => $emailData->toAddresses,
-                        'cc_addresses' => $emailData->ccAddresses,
-                        'subject' => $emailData->subject,
-                        'date' => $emailData->date,
-                        'body_text' => $emailData->bodyText,
-                        'body_html' => $emailData->bodyHtml,
-                        'attachments' => $this->sanitizeAttachments($emailData->attachments),
-                        'indexing_failed_at' => null,
-                        'indexing_error' => null,
-                    ],
-                );
+            return DB::transaction(function () use ($emails, $mailFolder, $user): Collection {
+                $now = now();
+                $records = collect($emails)
+                    ->map(function (EmailData $email) use ($mailFolder, $now, $user): array {
+                        $content = $this->contentProcessor->process($email);
+                        $attachments = $this->sanitizeAttachments($email->attachments);
+
+                        return [
+                            'mail_folder_id' => $mailFolder->id,
+                            'user_id' => $user->id,
+                            'uid_validity' => $mailFolder->uid_validity,
+                            'imap_uid' => $email->imapUid,
+                            'message_id' => filled($email->messageId) ? $email->messageId : null,
+                            'in_reply_to' => $email->inReplyTo,
+                            'references' => $email->references,
+                            'folder' => $mailFolder->path,
+                            'from_address' => $email->fromAddress,
+                            'from_name' => $email->fromName,
+                            'to_addresses' => json_encode($email->toAddresses, JSON_THROW_ON_ERROR),
+                            'cc_addresses' => json_encode($email->ccAddresses, JSON_THROW_ON_ERROR),
+                            'subject' => $email->subject,
+                            'date' => $email->date,
+                            'body_text' => $email->bodyText,
+                            'body_html' => $email->bodyHtml,
+                            'body_current' => $content->bodyCurrent,
+                            'body_quoted' => $content->bodyQuoted,
+                            'preview' => $content->preview,
+                            'attachments' => json_encode($attachments, JSON_THROW_ON_ERROR),
+                            'attachment_count' => count($attachments),
+                            'content_hash' => $content->contentHash,
+                            'parser_version' => $content->parserVersion,
+                            'indexing_failed_at' => null,
+                            'indexing_error' => null,
+                            'created_at' => $now,
+                            'updated_at' => $now,
+                        ];
+                    })
+                    ->all();
+
+                Email::withoutSyncingToSearch(function () use ($records): void {
+                    Email::query()->upsert(
+                        $records,
+                        ['mail_folder_id', 'uid_validity', 'imap_uid'],
+                        [
+                            'message_id',
+                            'in_reply_to',
+                            'references',
+                            'folder',
+                            'from_address',
+                            'from_name',
+                            'to_addresses',
+                            'cc_addresses',
+                            'subject',
+                            'date',
+                            'body_text',
+                            'body_html',
+                            'body_current',
+                            'body_quoted',
+                            'preview',
+                            'attachments',
+                            'attachment_count',
+                            'content_hash',
+                            'parser_version',
+                            'indexing_failed_at',
+                            'indexing_error',
+                            'updated_at',
+                        ],
+                    );
+                });
+
+                return Email::query()
+                    ->whereBelongsTo($mailFolder)
+                    ->where('uid_validity', $mailFolder->uid_validity)
+                    ->whereIn('imap_uid', collect($emails)->pluck('imapUid'))
+                    ->get();
             });
         } catch (Throwable $exception) {
             throw new IndexingException(
-                "Failed to index email [{$messageId}] for user [{$user->id}].",
-                previous: $exception,
-            );
-        }
-    }
-
-    public function isEmailIndexed(User $user, string $messageId): bool
-    {
-        return Email::query()
-            ->whereBelongsTo($user)
-            ->where('message_id', $messageId)
-            ->exists();
-    }
-
-    public function extractEmailData(ImapConnection $connection, string $messageId): EmailData
-    {
-        try {
-            $emailData = $this->imapConnectionService->getEmail($connection, $messageId);
-
-            return new EmailData(
-                messageId: $emailData->messageId,
-                fromAddress: $emailData->fromAddress,
-                fromName: $emailData->fromName,
-                toAddresses: $emailData->toAddresses,
-                ccAddresses: $emailData->ccAddresses,
-                subject: $emailData->subject,
-                date: $emailData->date,
-                bodyText: $emailData->bodyText,
-                bodyHtml: $emailData->bodyHtml,
-                attachments: $this->sanitizeAttachments($emailData->attachments),
-            );
-        } catch (Throwable $exception) {
-            throw new IndexingException(
-                "Failed to extract email data for message [{$messageId}].",
+                "Failed to index a batch of emails for user [{$user->id}].",
                 previous: $exception,
             );
         }

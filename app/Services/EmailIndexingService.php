@@ -3,20 +3,20 @@
 namespace App\Services;
 
 use App\DataTransferObjects\EmailData;
-use App\DataTransferObjects\ImapConnection;
 use App\Models\Email;
+use App\Models\MailFolder;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Collection;
 
 interface EmailIndexingService
 {
-    public function indexEmail(
+    /**
+     * @param  array<int, EmailData>  $emails
+     * @return Collection<int, Email>
+     */
+    public function indexEmails(
         User $user,
-        string $messageId,
-        string $folder,
-        ImapConnection $connection,
-    ): Email;
-
-    public function isEmailIndexed(User $user, string $messageId): bool;
-
-    public function extractEmailData(ImapConnection $connection, string $messageId): EmailData;
+        MailFolder $mailFolder,
+        array $emails,
+    ): Collection;
 }

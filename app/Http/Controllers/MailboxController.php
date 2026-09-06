@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\DataTransferObjects\EmailSearchResult;
 use App\Models\Email;
 use App\Models\User;
+use App\Services\EmailHtmlDocumentService;
 use App\Services\EmailSearchService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -13,8 +15,11 @@ use Inertia\Response;
 
 class MailboxController extends Controller
 {
-    public function index(Request $request, EmailSearchService $searchService): Response
-    {
+    public function index(
+        Request $request,
+        EmailSearchService $searchService,
+        EmailHtmlDocumentService $emailHtmlDocumentService,
+    ): Response {
         $validated = $request->validate([
             'query' => ['nullable', 'string', 'max:250'],
             'folder' => ['nullable', 'string', 'max:255'],
@@ -42,7 +47,7 @@ class MailboxController extends Controller
                 'folder' => $folder,
                 'email' => $selectedEmailId,
             ],
-            'selectedEmail' => function () use ($selectedEmailId, $user): ?array {
+            'selectedEmail' => function () use ($emailHtmlDocumentService, $selectedEmailId, $user): ?array {
                 if ($selectedEmailId === null) {
                     return null;
                 }
@@ -50,7 +55,7 @@ class MailboxController extends Controller
                 $selectedEmail = $this->emailDetailQuery($user)->find($selectedEmailId);
 
                 return $selectedEmail instanceof Email
-                    ? $this->emailDetail($selectedEmail)
+                    ? $this->emailDetail($selectedEmail, $emailHtmlDocumentService)
                     : null;
             },
             'emails' => function () use ($folder, $query, $searchService, $user): array {
@@ -60,11 +65,7 @@ class MailboxController extends Controller
 
                 return [
                     'data' => collect($results->items())
-                        ->map(fn (Email $email): array => [
-                            'id' => $email->id,
-                            'attachmentCount' => count($email->attachments ?? []),
-                            ...$searchService->formatResult($email, $query ?: null),
-                        ])
+                        ->map(fn (EmailSearchResult $email): array => $email->toArray())
                         ->values(),
                     'currentPage' => $results->currentPage(),
                     'lastPage' => $results->lastPage(),
@@ -101,19 +102,19 @@ class MailboxController extends Controller
         ];
     }
 
-    public function show(Request $request, int $emailId): Response
+    public function show(Request $request, int $emailId, EmailHtmlDocumentService $emailHtmlDocumentService): Response
     {
         /** @var User $user */
         $user = $request->user();
         $email = $this->emailDetailQuery($user)->findOrFail($emailId);
 
-        return Inertia::render('Email', ['email' => $this->emailDetail($email)]);
+        return Inertia::render('Email', ['email' => $this->emailDetail($email, $emailHtmlDocumentService)]);
     }
 
     /**
      * @return array{id: int, folder: string, from: string, to: string, cc: string, subject: string, date: ?string, document: string, attachments: Collection<int, array{filename: string, filetype: string}>}
      */
-    private function emailDetail(Email $email): array
+    private function emailDetail(Email $email, EmailHtmlDocumentService $emailHtmlDocumentService): array
     {
         return [
             'id' => $email->id,
@@ -125,7 +126,7 @@ class MailboxController extends Controller
             'cc' => $this->formatAddresses($email->cc_addresses),
             'subject' => $email->subject ?: '(no subject)',
             'date' => $email->date?->format('M j, Y g:i A'),
-            'document' => $this->iframeDocument($email),
+            'document' => $emailHtmlDocumentService->build($email->body_html, $email->body_text),
             'attachments' => collect($email->attachments)
                 ->filter(fn (array $attachment): bool => filled($attachment['filename'] ?? null)
                     || filled($attachment['filetype'] ?? null))
@@ -168,27 +169,5 @@ class MailboxController extends Controller
                 : ($address['address'] ?? ''))
             ->filter()
             ->join(', ');
-    }
-
-    private function iframeDocument(Email $email): string
-    {
-        if (filled($email->body_html)) {
-            return $this->wrapDocument($email->body_html);
-        }
-
-        return $this->wrapDocument('<pre style="margin:0;white-space:pre-wrap;word-break:break-word;font:14px/1.6 Arial,Helvetica,sans-serif;color:#111827;">'
-            .e($email->body_text ?? '').'</pre>');
-    }
-
-    private function wrapDocument(string $content): string
-    {
-        $content = trim($content);
-
-        if ($content === '' || preg_match('/<(?:!DOCTYPE|html|body)\b/i', $content) === 1) {
-            return $content;
-        }
-
-        return '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><base target="_blank"><style>html,body{margin:0;padding:0;background:#fff}img,table{max-width:100%}</style></head><body>'
-            .$content.'</body></html>';
     }
 }

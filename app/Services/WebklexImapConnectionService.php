@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\DataTransferObjects\EmailData;
 use App\DataTransferObjects\ImapConnection;
+use App\DataTransferObjects\MailFolderStatus;
 use App\Exceptions\Imap\AuthenticationException;
 use App\Exceptions\Imap\ImapConnectionException;
 use App\Models\ImapSetting;
@@ -75,18 +76,43 @@ class WebklexImapConnectionService implements ImapConnectionService
         }
     }
 
-    public function getMessageIds(ImapConnection $connection, string $folder): array
+    public function getFolderStatus(ImapConnection $connection, string $folder): MailFolderStatus
     {
         try {
-            $messages = $this->queryFolder($connection, $folder)
-                ->all()
-                ->setFetchBody(false)
+            $client = $this->client($connection);
+            $protocol = method_exists($client, 'getConnection') ? $client->getConnection() : $client;
+            $status = $protocol
+                ->folderStatus($folder)
+                ->validatedData();
+
+            return new MailFolderStatus(
+                path: $folder,
+                uidValidity: (int) ($status['uidvalidity'] ?? $status['UIDVALIDITY'] ?? 0),
+                uidNext: (int) ($status['uidnext'] ?? $status['UIDNEXT'] ?? 0),
+                messageCount: (int) ($status['messages'] ?? $status['MESSAGES'] ?? 0),
+            );
+        } catch (Throwable $exception) {
+            throw $this->mapException($exception);
+        }
+    }
+
+    public function getEmailsAfterUid(
+        ImapConnection $connection,
+        string $folder,
+        int $afterUid,
+        int $limit,
+    ): array {
+        try {
+            $query = $this->queryFolder($connection, $folder)
+                ->setFetchBody(true)
                 ->setFetchFlags(false)
-                ->get();
+                ->limit($limit);
+            $messages = $query->getByUidGreater($afterUid);
 
             return collect($messages)
-                ->map(fn ($message) => $this->stringValue($message->getMessageId()))
-                ->filter(fn (?string $messageId): bool => filled($messageId))
+                ->map(fn (object $message): EmailData => $this->emailData($message))
+                ->filter(fn (EmailData $email): bool => $email->imapUid > 0)
+                ->sortBy('imapUid')
                 ->values()
                 ->all();
         } catch (Throwable $exception) {
@@ -106,18 +132,7 @@ class WebklexImapConnectionService implements ImapConnectionService
                     ->first();
 
                 if ($message !== null) {
-                    return new EmailData(
-                        messageId: $this->stringValue($message->getMessageId()) ?? $messageId,
-                        fromAddress: $this->firstAddress($message->getFrom())['address'] ?? '',
-                        fromName: $this->firstAddress($message->getFrom())['name'] ?? null,
-                        toAddresses: $this->normalizeAddresses($message->getTo()),
-                        ccAddresses: $this->normalizeAddresses($message->getCc()),
-                        subject: $this->decodeMimeHeader($this->stringValue($message->getSubject())) ?? '',
-                        date: $this->normalizeDate($message->getDate()),
-                        bodyText: $this->nullableString($message->getTextBody()),
-                        bodyHtml: $this->nullableString($message->getHTMLBody()),
-                        attachments: $this->normalizeAttachments($message->getAttachments()),
-                    );
+                    return $this->emailData($message, $messageId);
                 }
             }
         } catch (ImapConnectionException $exception) {
@@ -127,6 +142,30 @@ class WebklexImapConnectionService implements ImapConnectionService
         }
 
         throw new ImapConnectionException("Email with message ID [{$messageId}] was not found.");
+    }
+
+    protected function emailData(object $message, ?string $fallbackMessageId = null): EmailData
+    {
+        return new EmailData(
+            messageId: $this->stringValue($message->getMessageId()) ?? $fallbackMessageId ?? '',
+            fromAddress: $this->firstAddress($message->getFrom())['address'] ?? '',
+            fromName: $this->firstAddress($message->getFrom())['name'] ?? null,
+            toAddresses: $this->normalizeAddresses($message->getTo()),
+            ccAddresses: $this->normalizeAddresses($message->getCc()),
+            subject: $this->decodeMimeHeader($this->stringValue($message->getSubject())) ?? '',
+            date: $this->normalizeDate($message->getDate()),
+            bodyText: $this->nullableString($message->getTextBody()),
+            bodyHtml: $this->nullableString($message->getHTMLBody()),
+            attachments: $this->normalizeAttachments($message->getAttachments()),
+            imapUid: (int) $this->messageValue($message, 'getUid'),
+            inReplyTo: $this->stringValue($this->messageValue($message, 'getInReplyTo')),
+            references: $this->stringValue($this->messageValue($message, 'getReferences')),
+        );
+    }
+
+    private function messageValue(object $message, string $method): mixed
+    {
+        return is_callable([$message, $method]) ? $message->{$method}() : null;
     }
 
     protected function makeClient(

@@ -4,6 +4,7 @@ namespace Tests\Support\Fakes;
 
 use App\DataTransferObjects\EmailData;
 use App\DataTransferObjects\ImapConnection;
+use App\DataTransferObjects\MailFolderStatus;
 use App\Exceptions\Imap\ImapConnectionException;
 use App\Models\ImapSetting;
 use App\Services\ImapConnectionService;
@@ -61,9 +62,26 @@ class ScriptedImapConnectionService implements ImapConnectionService
         return array_keys($this->mailboxesFor($connection));
     }
 
-    public function getMessageIds(ImapConnection $connection, string $folder): array
+    public function getFolderStatus(ImapConnection $connection, string $folder): MailFolderStatus
     {
-        return array_keys($this->mailboxesFor($connection)[$folder] ?? []);
+        $emails = $this->mailboxesFor($connection)[$folder] ?? [];
+        $highestUid = collect($emails)->max(fn (EmailData $email): int => $email->imapUid) ?: 0;
+
+        return new MailFolderStatus($folder, 1, $highestUid + 1, count($emails));
+    }
+
+    public function getEmailsAfterUid(
+        ImapConnection $connection,
+        string $folder,
+        int $afterUid,
+        int $limit,
+    ): array {
+        return collect($this->mailboxesFor($connection)[$folder] ?? [])
+            ->filter(fn (EmailData $email): bool => $email->imapUid > $afterUid)
+            ->sortBy('imapUid')
+            ->take($limit)
+            ->values()
+            ->all();
     }
 
     public function getEmail(ImapConnection $connection, string $messageId): EmailData

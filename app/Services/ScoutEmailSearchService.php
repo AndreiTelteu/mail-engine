@@ -2,17 +2,19 @@
 
 namespace App\Services;
 
+use App\DataTransferObjects\EmailSearchResult;
 use App\Models\Email;
 use App\Models\User;
+use Closure;
 use Illuminate\Pagination\LengthAwarePaginator;
-use Illuminate\Support\Str;
-use Laravel\Scout\Builder as ScoutBuilder;
+use Illuminate\Pagination\Paginator;
+use Symfony\Component\HttpKernel\Exception\ServiceUnavailableHttpException;
 use Throwable;
 
 class ScoutEmailSearchService implements EmailSearchService
 {
     public function __construct(
-        protected mixed $searchExecutor = null,
+        protected ?Closure $searchExecutor = null,
     ) {}
 
     public function search(User $user, string $query, ?string $folder = null, int $perPage = 20): LengthAwarePaginator
@@ -20,17 +22,12 @@ class ScoutEmailSearchService implements EmailSearchService
         $query = trim($query);
 
         if ($query === '') {
-            return $this->recentQuery($user, $folder)->paginate($perPage);
-        }
-
-        if (! $this->shouldUseScout()) {
-            return $this->fallbackSearch($user, $query, $folder, $perPage);
+            return $this->recent($user, $folder, $perPage);
         }
 
         try {
-            $builder = is_callable($this->searchExecutor)
-                ? new ScoutBuilder(new Email, $query)
-                : Email::search($query);
+            $page = Paginator::resolveCurrentPage();
+            $builder = Email::search($query);
 
             $builder->where('user_id', $user->id);
 
@@ -38,74 +35,44 @@ class ScoutEmailSearchService implements EmailSearchService
                 $builder->where('folder', $folder);
             }
 
-            if (is_callable($this->searchExecutor)) {
-                return ($this->searchExecutor)($builder, $perPage);
-            }
+            /** @var array{found?: int, hits?: array<int, array<string, mixed>>} $results */
+            $builder->options([
+                'page' => $page,
+                'per_page' => $perPage,
+            ]);
+            $results = $this->searchExecutor instanceof Closure
+                ? ($this->searchExecutor)($builder, $page, $perPage)
+                : $builder->raw();
 
-            return $builder->paginate($perPage);
-        } catch (Throwable) {
-            $this->flashFallbackWarning();
+            return new LengthAwarePaginator(
+                collect($results['hits'] ?? [])
+                    ->map(fn (array $hit): EmailSearchResult => EmailSearchResult::fromTypesenseHit($hit)),
+                (int) ($results['found'] ?? 0),
+                $perPage,
+                $page,
+                ['path' => Paginator::resolveCurrentPath()],
+            );
+        } catch (Throwable $exception) {
+            report($exception);
 
-            return $this->fallbackSearch($user, $query, $folder, $perPage);
+            throw new ServiceUnavailableHttpException(
+                retryAfter: null,
+                message: 'Typesense is unavailable. Search cannot run until it is reachable again.',
+                previous: $exception,
+            );
         }
     }
 
     public function getRecent(User $user, int $perPage = 20): LengthAwarePaginator
     {
-        return $this->recentQuery($user)->paginate($perPage);
+        return $this->recent($user, null, $perPage);
     }
 
-    /**
-     * Result fields are HTML: message text is escaped here and matched terms are
-     * wrapped in `<mark>`, so callers render them as markup without trusting mail
-     * content.
-     */
-    public function formatResult(Email $email, ?string $query = null): array
+    private function recent(User $user, ?string $folder, int $perPage): LengthAwarePaginator
     {
-        $from = e($email->from_name ? "{$email->from_name} <{$email->from_address}>" : (string) $email->from_address);
-        $subject = e($email->subject ?: '(no subject)');
-        $previewSource = $email->body_text ?: strip_tags((string) $email->body_html);
-        $preview = e($this->makePreview($previewSource));
-
-        if ($query !== null && trim($query) !== '') {
-            $from = $this->highlightTerms($from, $query);
-            $subject = $this->highlightTerms($subject, $query);
-            $preview = $this->highlightTerms($preview, $query);
-        }
-
-        return [
-            'from' => $from,
-            'subject' => $subject,
-            'preview' => $preview,
-            'display' => trim("{$from}: {$subject} {$preview}"),
-            'folder' => $email->folder,
-            'date' => $email->date?->toIso8601String() ?? '',
-        ];
-    }
-
-    protected function shouldUseScout(): bool
-    {
-        return filled(config('scout.driver'));
-    }
-
-    protected function fallbackSearch(User $user, string $query, ?string $folder, int $perPage): LengthAwarePaginator
-    {
-        return Email::query()
-            ->select($this->resultColumns())
-            ->whereBelongsTo($user)
-            ->when($folder !== null, fn ($emailQuery) => $emailQuery->where('folder', $folder))
-            ->where(function ($emailQuery) use ($query): void {
-                $like = '%'.$query.'%';
-
-                $emailQuery
-                    ->where('from_address', 'like', $like)
-                    ->orWhere('from_name', 'like', $like)
-                    ->orWhere('subject', 'like', $like)
-                    ->orWhere('body_text', 'like', $like)
-                    ->orWhere('body_html', 'like', $like);
-            })
-            ->orderByDesc('date')
-            ->paginate($perPage);
+        return $this->recentQuery($user, $folder)
+            ->paginate($perPage)
+            ->through(fn (Email $email): EmailSearchResult => EmailSearchResult::fromEmail($email));
     }
 
     protected function recentQuery(User $user, ?string $folder = null)
@@ -130,46 +97,8 @@ class ScoutEmailSearchService implements EmailSearchService
             'from_name',
             'subject',
             'date',
-            'body_text',
-            'body_html',
-            'attachments',
+            'preview',
+            'attachment_count',
         ];
-    }
-
-    protected function makePreview(?string $text): string
-    {
-        return Str::limit(
-            preg_replace('/\s+/u', ' ', trim((string) $text)) ?: '',
-            140,
-        );
-    }
-
-    /**
-     * Wraps matched terms in `<mark>` inside already-escaped text.
-     */
-    protected function highlightTerms(string $text, string $query): string
-    {
-        $terms = collect(preg_split('/\s+/u', trim($query)) ?: [])
-            ->map(fn (string $term): string => e($term))
-            ->filter()
-            ->unique()
-            ->sortByDesc(fn (string $term): int => mb_strlen($term))
-            ->values();
-
-        return $terms->reduce(
-            fn (string $carry, string $term): string => preg_replace(
-                '/('.preg_quote($term, '/').')/iu',
-                '<mark>$1</mark>',
-                $carry,
-            ) ?? $carry,
-            $text,
-        );
-    }
-
-    protected function flashFallbackWarning(): void
-    {
-        if (app()->bound('session')) {
-            session()->flash('warning', 'Search is temporarily unavailable. Showing basic results.');
-        }
     }
 }

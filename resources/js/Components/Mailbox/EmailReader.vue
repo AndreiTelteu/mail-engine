@@ -67,11 +67,11 @@ const recipients = computed(() =>
         </header>
 
         <div class="flex min-h-0 flex-1 flex-col">
-            <!-- Sanitized mail HTML stays inside its sandboxed document, which owns its own scrolling. -->
+            <!-- Server-generated HTML blocks active content, remote images, and forces links into new tabs. -->
             <iframe
                 class="w-full flex-1 bg-white"
                 :class="variant === 'page' ? 'min-h-[38rem]' : 'min-h-0'"
-                sandbox="allow-popups allow-popups-to-escape-sandbox allow-same-origin"
+                sandbox="allow-popups allow-popups-to-escape-sandbox"
                 referrerpolicy="no-referrer"
                 :srcdoc="email.document"
                 :title="`Message content: ${email.subject}`"

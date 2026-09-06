@@ -2,7 +2,7 @@
 
 namespace App\Console\Commands;
 
-use App\Jobs\IndexEmailJob;
+use App\Jobs\SyncFolderEmailsJob;
 use App\Models\Email;
 use Illuminate\Console\Command;
 
@@ -17,7 +17,7 @@ class RetryFailedIndexingCommand extends Command
         $failedEmails = Email::query()
             ->whereNotNull('indexing_failed_at')
             ->orderBy('id')
-            ->get(['id', 'user_id', 'message_id', 'folder', 'indexing_failed_at']);
+            ->get(['id', 'user_id', 'mail_folder_id', 'indexing_failed_at']);
 
         if ($failedEmails->isEmpty()) {
             $this->components->info('No failed email indexing records were found.');
@@ -31,9 +31,9 @@ class RetryFailedIndexingCommand extends Command
             return self::SUCCESS;
         }
 
-        foreach ($failedEmails as $email) {
-            IndexEmailJob::dispatch($email->user_id, $email->message_id, $email->folder);
-        }
+        $failedEmails
+            ->unique(fn (Email $email): string => "{$email->user_id}:{$email->mail_folder_id}")
+            ->each(fn (Email $email): mixed => SyncFolderEmailsJob::dispatch($email->user_id, $email->mail_folder_id));
 
         $this->components->info("Queued {$failedEmails->count()} failed email indexing record(s) for retry.");
 

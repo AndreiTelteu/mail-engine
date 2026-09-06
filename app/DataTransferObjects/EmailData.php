@@ -22,5 +22,8 @@ readonly class EmailData
         public ?string $bodyText,
         public ?string $bodyHtml,
         public array $attachments,
+        public int $imapUid = 0,
+        public ?string $inReplyTo = null,
+        public ?string $references = null,
     ) {}
 }

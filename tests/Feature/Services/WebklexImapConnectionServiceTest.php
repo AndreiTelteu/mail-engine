@@ -8,7 +8,6 @@ use App\Models\User;
 use App\Services\WebklexImapConnectionService;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
-use Mockery;
 use Webklex\PHPIMAP\Client;
 use Webklex\PHPIMAP\ClientManager;
 use Webklex\PHPIMAP\Exceptions\AuthFailedException;
@@ -110,22 +109,10 @@ test('get folders returns folder paths from the connection resource', function (
     expect($service->getFolders($connection))->toBe(['INBOX', 'Sent']);
 });
 
-test('get message ids returns all message ids in a folder', function () {
+test('get folder status and incremental messages use IMAP UIDs', function () {
     $messages = [
-        new class
-        {
-            public function getMessageId(): string
-            {
-                return '<first@example.com>';
-            }
-        },
-        new class
-        {
-            public function getMessageId(): string
-            {
-                return '<second@example.com>';
-            }
-        },
+        imapMessageWithUid('<first@example.com>', 1),
+        imapMessageWithUid('<second@example.com>', 2),
     ];
 
     $connection = makeImapConnectionWithResource(fakeClientWithFolders([
@@ -134,8 +121,13 @@ test('get message ids returns all message ids in a folder', function () {
 
     $service = new WebklexImapConnectionService(Mockery::mock(ClientManager::class));
 
-    expect($service->getMessageIds($connection, 'INBOX'))
-        ->toBe(['<first@example.com>', '<second@example.com>']);
+    $status = $service->getFolderStatus($connection, 'INBOX');
+    $emails = $service->getEmailsAfterUid($connection, 'INBOX', 1, 100);
+
+    expect($status->uidValidity)->toBe(1)
+        ->and($status->uidNext)->toBe(3)
+        ->and($status->messageCount)->toBe(2)
+        ->and(collect($emails)->pluck('imapUid')->all())->toBe([2]);
 });
 
 test('get email builds an email dto from the first matching message across folders', function () {
@@ -302,6 +294,67 @@ function makeImapConnectionWithResource(object $resource): ImapConnection
     return new ImapConnection($resource, $setting);
 }
 
+function imapMessageWithUid(string $messageId, int $uid): object
+{
+    return new class($messageId, $uid)
+    {
+        public function __construct(
+            private string $messageId,
+            private int $uid,
+        ) {}
+
+        public function getMessageId(): string
+        {
+            return $this->messageId;
+        }
+
+        public function getUid(): int
+        {
+            return $this->uid;
+        }
+
+        public function getFrom(): array
+        {
+            return [];
+        }
+
+        public function getTo(): array
+        {
+            return [];
+        }
+
+        public function getCc(): array
+        {
+            return [];
+        }
+
+        public function getSubject(): string
+        {
+            return '';
+        }
+
+        public function getDate(): CarbonImmutable
+        {
+            return CarbonImmutable::now();
+        }
+
+        public function getTextBody(): string
+        {
+            return '';
+        }
+
+        public function getHTMLBody(): string
+        {
+            return '';
+        }
+
+        public function getAttachments(): array
+        {
+            return [];
+        }
+    };
+}
+
 /**
  * @param  array<string, array<int, object>>  $folders
  */
@@ -342,7 +395,10 @@ function fakeClientWithFolders(array $folders): object
                         /**
                          * @param  array<int, object>  $messages
                          */
-                        public function __construct(private array $messages) {}
+                        public function __construct(
+                            private array $messages,
+                            private ?int $limit = null,
+                        ) {}
 
                         public function all(): static
                         {
@@ -369,11 +425,49 @@ function fakeClientWithFolders(array $folders): object
                             return $this;
                         }
 
+                        public function limit(int $limit): static
+                        {
+                            $this->limit = $limit;
+
+                            return $this;
+                        }
+
+                        public function getByUidGreater(int $uid): Collection
+                        {
+                            return collect($this->messages)
+                                ->filter(fn (object $message): bool => $message->getUid() > $uid)
+                                ->take($this->limit)
+                                ->values();
+                        }
+
                         public function get(): Collection
                         {
                             return collect($this->messages);
                         }
                     };
+                }
+            };
+        }
+
+        public function folderStatus(string $folder): object
+        {
+            $messages = $this->folders[$folder] ?? [];
+            $highestUid = collect($messages)->max(fn (object $message): int => $message->getUid()) ?: 0;
+
+            return new class($highestUid, count($messages))
+            {
+                public function __construct(
+                    private int $highestUid,
+                    private int $messageCount,
+                ) {}
+
+                public function validatedData(): array
+                {
+                    return [
+                        'uidvalidity' => 1,
+                        'uidnext' => $this->highestUid + 1,
+                        'messages' => $this->messageCount,
+                    ];
                 }
             };
         }

@@ -2,6 +2,7 @@
 
 namespace App\Livewire;
 
+use App\DataTransferObjects\EmailSearchResult;
 use App\Models\Email;
 use App\Services\EmailSearchService;
 use Illuminate\Support\Facades\Auth;
@@ -63,8 +64,8 @@ class EmailSearchComponent extends Component
             : $searchService->search($user, $this->query, $this->folderFilter, $this->perPage);
 
         $formattedResults = collect($results->items())
-            ->mapWithKeys(fn (Email $email): array => [
-                $email->id => $searchService->formatResult($email, $this->query ?: null),
+            ->mapWithKeys(fn (EmailSearchResult $email): array => [
+                $email->id => $email->toArray(),
             ]);
 
         $folders = Email::query()

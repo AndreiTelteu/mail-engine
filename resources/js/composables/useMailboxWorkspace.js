@@ -20,8 +20,9 @@ export function useMailboxWorkspace(props) {
     const searchField = ref(null);
 
     let debounceTimer;
+    let suppressNextSearch = false;
 
-    const visit = (overrides = {}) => {
+    const visit = (overrides = {}, only = ['filters', 'emails']) => {
         router.get(
             routes.mailbox,
             {
@@ -35,6 +36,7 @@ export function useMailboxWorkspace(props) {
                 preserveState: true,
                 preserveScroll: true,
                 replace: true,
+                only,
                 onStart: () => (searching.value = true),
                 onFinish: () => (searching.value = false),
             },
@@ -42,12 +44,18 @@ export function useMailboxWorkspace(props) {
     };
 
     watch(query, () => {
+        if (suppressNextSearch) {
+            suppressNextSearch = false;
+
+            return;
+        }
+
         clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => visit({ page: undefined }), 250);
     });
 
     const selectFolder = (folder) => visit({ folder: folder || undefined, page: undefined });
-    const selectEmail = (id) => visit({ email: id });
+    const selectEmail = (id) => visit({ email: id }, ['filters', 'selectedEmail']);
     const emailHref = (id) => {
         const parameters = new URLSearchParams();
 
@@ -67,17 +75,19 @@ export function useMailboxWorkspace(props) {
 
         return `${routes.mailbox}?${parameters.toString()}`;
     };
-    const closeEmail = () => visit({ email: undefined });
+    const closeEmail = () => visit({ email: undefined }, ['filters', 'selectedEmail']);
     const goToPage = (page) => visit({ page: page > 1 ? page : undefined });
 
     const reset = () => {
         clearTimeout(debounceTimer);
+        suppressNextSearch = true;
         query.value = '';
         visit({ query: undefined, folder: undefined, page: undefined });
     };
 
     const clearQuery = () => {
         clearTimeout(debounceTimer);
+        suppressNextSearch = true;
         query.value = '';
         visit({ query: undefined, page: undefined });
     };

@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\DataTransferObjects\EmailData;
 use App\DataTransferObjects\ImapConnection;
+use App\DataTransferObjects\MailFolderStatus;
 use App\Models\ImapSetting;
 
 interface ImapConnectionService
@@ -23,10 +24,17 @@ interface ImapConnectionService
      */
     public function getFolders(ImapConnection $connection): array;
 
+    public function getFolderStatus(ImapConnection $connection, string $folder): MailFolderStatus;
+
     /**
-     * @return array<int, string>
+     * @return array<int, EmailData>
      */
-    public function getMessageIds(ImapConnection $connection, string $folder): array;
+    public function getEmailsAfterUid(
+        ImapConnection $connection,
+        string $folder,
+        int $afterUid,
+        int $limit,
+    ): array;
 
     public function getEmail(ImapConnection $connection, string $messageId): EmailData;
 }
