@@ -163,6 +163,48 @@ class WebklexImapConnectionService implements ImapConnectionService
         }
     }
 
+    public function getInlineImages(ImapConnection $connection, string $folder, int $uid, array $contentIds): array
+    {
+        try {
+            $message = $this->queryFolder($connection, $folder)
+                ->whereUid($uid)
+                ->setFetchBody(true)
+                ->setFetchFlags(false)
+                ->get()
+                ->first();
+            $images = [];
+            $totalBytes = 0;
+
+            foreach ($message?->getAttachments() ?? [] as $attachment) {
+                $contentId = trim((string) $attachment->getId(), '<>');
+                $mimeType = strtolower((string) $attachment->getContentType());
+
+                if (! in_array($contentId, $contentIds, true) || ! in_array($mimeType, ['image/gif', 'image/jpeg', 'image/png', 'image/webp'], true)) {
+                    continue;
+                }
+
+                $content = $attachment->getContent();
+
+                if (! is_string($content)) {
+                    continue;
+                }
+
+                $size = strlen($content);
+
+                if ($size > 2 * 1024 * 1024 || $totalBytes + $size > 8 * 1024 * 1024) {
+                    continue;
+                }
+
+                $images[$contentId] = ['mimeType' => $mimeType, 'content' => $content];
+                $totalBytes += $size;
+            }
+
+            return $images;
+        } catch (Throwable $exception) {
+            throw $this->mapException($exception);
+        }
+    }
+
     protected function emailData(object $message, ?string $fallbackMessageId = null): EmailData
     {
         return new EmailData(

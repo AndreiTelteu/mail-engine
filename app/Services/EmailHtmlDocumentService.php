@@ -2,14 +2,53 @@
 
 namespace App\Services;
 
+use App\Models\Email;
 use DOMAttr;
 use DOMDocument;
 use DOMElement;
 use DOMXPath;
+use Throwable;
 
 class EmailHtmlDocumentService
 {
-    public function build(?string $html, ?string $text): string
+    public function __construct(protected ImapConnectionService $imap) {}
+
+    public function buildForEmail(Email $email): string
+    {
+        $html = $email->body_html;
+        $inlineImages = [];
+
+        if (is_string($html) && preg_match_all('~\bcid:([^\s"\x27<>]+)~i', $html, $matches)) {
+            $email->loadMissing('mailFolder.imapSetting');
+            $contentIds = array_values(array_unique(array_map(
+                fn (string $contentId): string => trim(rawurldecode($contentId), '<>()'),
+                $matches[1],
+            )));
+            $connection = null;
+
+            try {
+                $setting = $email->mailFolder?->imapSetting;
+
+                if ($setting !== null && $setting->user_id === $email->user_id) {
+                    $connection = $this->imap->connect($setting);
+                    $folder = $email->mailFolder->path;
+
+                    if ($this->imap->getFolderStatus($connection, $folder)->uidValidity === (int) $email->uid_validity) {
+                        $inlineImages = $this->imap->getInlineImages($connection, $folder, $email->imap_uid, $contentIds);
+                    }
+                }
+            } catch (Throwable $exception) {
+                report($exception);
+            } finally {
+                $connection?->disconnect();
+            }
+        }
+
+        return $this->build($html, $email->body_text, $inlineImages);
+    }
+
+    /** @param array<string, array{mimeType: string, content: string}> $inlineImages */
+    public function build(?string $html, ?string $text, array $inlineImages = []): string
     {
         if (blank($html)) {
             return $this->plainTextDocument($text ?? '');
@@ -43,6 +82,13 @@ class EmailHtmlDocumentService
                 || (in_array($attributeName, ['href', 'src', 'action'], true) && str_starts_with($attributeValue, 'javascript:'))
             ) {
                 $attribute->ownerElement?->removeAttributeNode($attribute);
+            } elseif (in_array($attributeName, ['src', 'background'], true) && str_starts_with($attributeValue, 'cid:')) {
+                $contentId = trim(rawurldecode(substr(trim($attribute->value), 4)), '<>');
+                $image = $inlineImages[$contentId] ?? null;
+
+                if ($image !== null) {
+                    $attribute->value = 'data:'.$image['mimeType'].';base64,'.base64_encode($image['content']);
+                }
             }
         }
 
@@ -60,7 +106,7 @@ class EmailHtmlDocumentService
 
         $contentSecurityPolicy = $document->createElement('meta');
         $contentSecurityPolicy->setAttribute('http-equiv', 'Content-Security-Policy');
-        $contentSecurityPolicy->setAttribute('content', "default-src 'none'; img-src data: cid:; style-src 'unsafe-inline'; font-src data:; media-src data:;");
+        $contentSecurityPolicy->setAttribute('content', "default-src 'none'; img-src data: https: http:; style-src 'unsafe-inline'; font-src data:; media-src data:;");
         $head->appendChild($contentSecurityPolicy);
 
         $base = $document->createElement('base');

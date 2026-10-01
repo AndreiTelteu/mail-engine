@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\DataTransferObjects\EmailSearchResult;
 use App\Models\Email;
 use App\Models\User;
+use App\Services\EmailAttachmentService;
 use App\Services\EmailHtmlDocumentService;
 use App\Services\EmailSearchService;
 use Illuminate\Database\Eloquent\Builder;
@@ -19,6 +20,7 @@ class MailboxController extends Controller
         Request $request,
         EmailSearchService $searchService,
         EmailHtmlDocumentService $emailHtmlDocumentService,
+        EmailAttachmentService $emailAttachmentService,
     ): Response {
         $validated = $request->validate([
             'query' => ['nullable', 'string', 'max:250'],
@@ -50,7 +52,7 @@ class MailboxController extends Controller
                 'hasAttachments' => $hasAttachments,
                 'email' => $selectedEmailId,
             ],
-            'selectedEmail' => function () use ($emailHtmlDocumentService, $selectedEmailId, $user): ?array {
+            'selectedEmail' => function () use ($emailHtmlDocumentService, $emailAttachmentService, $selectedEmailId, $user): ?array {
                 if ($selectedEmailId === null) {
                     return null;
                 }
@@ -58,7 +60,7 @@ class MailboxController extends Controller
                 $selectedEmail = $this->emailDetailQuery($user)->find($selectedEmailId);
 
                 return $selectedEmail instanceof Email
-                    ? $this->emailDetail($selectedEmail, $emailHtmlDocumentService)
+                    ? $this->emailDetail($selectedEmail, $emailHtmlDocumentService, $emailAttachmentService)
                     : null;
             },
             'emails' => function () use ($folder, $hasAttachments, $query, $searchService, $user): array {
@@ -105,19 +107,19 @@ class MailboxController extends Controller
         ];
     }
 
-    public function show(Request $request, int $emailId, EmailHtmlDocumentService $emailHtmlDocumentService): Response
+    public function show(Request $request, int $emailId, EmailHtmlDocumentService $emailHtmlDocumentService, EmailAttachmentService $emailAttachmentService): Response
     {
         /** @var User $user */
         $user = $request->user();
         $email = $this->emailDetailQuery($user)->findOrFail($emailId);
 
-        return Inertia::render('Email', ['email' => $this->emailDetail($email, $emailHtmlDocumentService)]);
+        return Inertia::render('Email', ['email' => $this->emailDetail($email, $emailHtmlDocumentService, $emailAttachmentService)]);
     }
 
     /**
-     * @return array{id: int, folder: string, from: string, to: string, cc: string, subject: string, date: ?string, document: string, attachments: Collection<int, array{filename: string, filetype: string}>}
+     * @return array{id: int, folder: string, from: string, to: string, cc: string, subject: string, date: ?string, document: string, attachments: Collection<int, array{filename: string, filetype: string, downloadUrl: string, previewUrl: ?string}>}
      */
-    private function emailDetail(Email $email, EmailHtmlDocumentService $emailHtmlDocumentService): array
+    private function emailDetail(Email $email, EmailHtmlDocumentService $emailHtmlDocumentService, EmailAttachmentService $emailAttachmentService): array
     {
         return [
             'id' => $email->id,
@@ -129,13 +131,17 @@ class MailboxController extends Controller
             'cc' => $this->formatAddresses($email->cc_addresses),
             'subject' => $email->subject ?: '(no subject)',
             'date' => $email->date?->format('M j, Y g:i A'),
-            'document' => $emailHtmlDocumentService->build($email->body_html, $email->body_text),
+            'document' => $emailHtmlDocumentService->buildForEmail($email),
             'attachments' => collect($email->attachments)
                 ->filter(fn (array $attachment): bool => filled($attachment['filename'] ?? null)
                     || filled($attachment['filetype'] ?? null))
-                ->map(fn (array $attachment): array => [
+                ->map(fn (array $attachment, int $index): array => [
                     'filename' => $attachment['filename'] ?? 'unknown',
                     'filetype' => $attachment['filetype'] ?? 'unknown',
+                    'downloadUrl' => route('emails.attachments.download', ['emailId' => $email->id, 'index' => $index]),
+                    'previewUrl' => $emailAttachmentService->canPreview($attachment)
+                        ? route('emails.attachments.preview', ['emailId' => $email->id, 'index' => $index])
+                        : null,
                 ])
                 ->values(),
         ];
@@ -148,6 +154,9 @@ class MailboxController extends Controller
             ->select([
                 'id',
                 'user_id',
+                'mail_folder_id',
+                'uid_validity',
+                'imap_uid',
                 'folder',
                 'from_address',
                 'from_name',

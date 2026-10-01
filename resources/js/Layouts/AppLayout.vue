@@ -46,7 +46,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-    <div class="flex min-h-svh flex-col bg-canvas text-ink lg:h-svh lg:flex-row lg:overflow-hidden">
+    <div data-app-shell class="flex h-dvh flex-col overflow-hidden bg-canvas text-ink lg:flex-row">
         <a
             href="#main-content"
             class="sr-only focus-visible:not-sr-only focus-visible:fixed focus-visible:top-3 focus-visible:left-3 focus-visible:z-50 focus-visible:rounded-md focus-visible:bg-surface focus-visible:px-3 focus-visible:py-2"
@@ -135,7 +135,7 @@ onBeforeUnmount(() => {
 
         <main
             id="main-content"
-            class="flex min-h-0 min-w-0 flex-1 flex-col lg:overflow-hidden"
+            class="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto lg:overflow-hidden"
         >
             <slot />
         </main>

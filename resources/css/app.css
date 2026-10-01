@@ -251,6 +251,13 @@
     }
 }
 
+html:has([data-app-shell]),
+body:has([data-app-shell]) {
+    height: 100dvh;
+    min-height: 0;
+    overflow: hidden;
+}
+
 @layer components {
     .btn {
         display: inline-flex;

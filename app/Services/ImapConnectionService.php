@@ -39,4 +39,10 @@ interface ImapConnectionService
     public function getEmail(ImapConnection $connection, string $messageId): EmailData;
 
     public function getAttachment(ImapConnection $connection, string $folder, int $uid, int $index): ?string;
+
+    /**
+     * @param  array<int, string>  $contentIds
+     * @return array<string, array{mimeType: string, content: string}>
+     */
+    public function getInlineImages(ImapConnection $connection, string $folder, int $uid, array $contentIds): array;
 }

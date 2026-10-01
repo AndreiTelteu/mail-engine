@@ -1,10 +1,14 @@
 <?php
 
+use App\DataTransferObjects\ImapConnection;
+use App\DataTransferObjects\MailFolderStatus;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Models\Email;
 use App\Models\ImapSetting;
 use App\Models\MailFolder;
 use App\Models\User;
+use App\Services\ImapConnectionService;
+use Tests\Support\Fakes\ScriptedImapConnectionService;
 
 function createRoutedEmail(User $user, array $overrides = []): Email
 {
@@ -62,6 +66,116 @@ test('mail routes require authentication', function () {
     $this->get(route('mail.settings'))->assertRedirect(route('login'));
     $this->get(route('emails.index'))->assertRedirect(route('login'));
     $this->get(route('emails.show', ['emailId' => $email->id]))->assertRedirect(route('login'));
+    $this->get(route('emails.attachments.download', ['emailId' => $email->id, 'index' => 0]))->assertRedirect(route('login'));
+    $this->get(route('emails.attachments.preview', ['emailId' => $email->id, 'index' => 0]))->assertRedirect(route('login'));
+});
+
+test('attachments can be downloaded and safe files previewed from IMAP', function () {
+    $user = User::factory()->create();
+    $email = createRoutedEmail($user, [
+        'attachments' => [
+            ['filename' => null, 'filetype' => null],
+            ['filename' => 'reports/invoice.pdf', 'filetype' => 'application/pdf'],
+            ['filename' => 'logo.png', 'filetype' => 'image/png'],
+        ],
+    ]);
+    $imap = new class extends ScriptedImapConnectionService
+    {
+        public array $requestedIndexes = [];
+
+        public function getAttachment(ImapConnection $connection, string $folder, int $uid, int $index): ?string
+        {
+            $this->requestedIndexes[] = $index;
+
+            return $index === 1
+                ? "%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\n%%EOF"
+                : base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScL/nwAAAABJRU5ErkJggg==');
+        }
+    };
+    $this->app->instance(ImapConnectionService::class, $imap);
+
+    $this->actingAs($user)
+        ->get(route('emails.show', ['emailId' => $email->id]))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->where('email.attachments.0.downloadUrl', route('emails.attachments.download', ['emailId' => $email->id, 'index' => 1]))
+            ->where('email.attachments.0.previewUrl', route('emails.attachments.preview', ['emailId' => $email->id, 'index' => 1]))
+            ->where('email.attachments.1.previewUrl', route('emails.attachments.preview', ['emailId' => $email->id, 'index' => 2])));
+
+    $this->get(route('emails.attachments.preview', ['emailId' => $email->id, 'index' => 1]))
+        ->assertOk()
+        ->assertHeader('Content-Type', 'application/pdf')
+        ->assertHeaderContains('Content-Disposition', 'inline;')
+        ->assertHeader('X-Content-Type-Options', 'nosniff');
+
+    $this->get(route('emails.attachments.download', ['emailId' => $email->id, 'index' => 1]))
+        ->assertOk()
+        ->assertHeader('Content-Type', 'application/octet-stream')
+        ->assertHeaderContains('Content-Disposition', 'attachment;')
+        ->assertHeaderContains('Content-Disposition', 'invoice.pdf')
+        ->assertSee('%PDF-1.4');
+
+    $this->get(route('emails.attachments.preview', ['emailId' => $email->id, 'index' => 2]))
+        ->assertOk()
+        ->assertHeader('Content-Type', 'image/png')
+        ->assertHeaderContains('Content-Disposition', 'inline;');
+
+    expect($imap->requestedIndexes)->toBe([1, 1, 2])
+        ->and($imap->disconnectCounts[$user->email] ?? null)->toBe(3);
+});
+
+test('attachment routes reject other users, stale mailboxes, missing parts and unsafe previews', function () {
+    $owner = User::factory()->create();
+    $otherUser = User::factory()->create();
+    $email = createRoutedEmail($owner, [
+        'attachments' => [['filename' => 'webpage.html', 'filetype' => 'text/html']],
+    ]);
+    $imap = new class extends ScriptedImapConnectionService
+    {
+        public int $uidValidity = 1;
+
+        public ?string $content = '<script>alert(1)</script>';
+
+        public function getFolderStatus(ImapConnection $connection, string $folder): MailFolderStatus
+        {
+            return new MailFolderStatus($folder, $this->uidValidity, 2, 1);
+        }
+
+        public function getAttachment(ImapConnection $connection, string $folder, int $uid, int $index): ?string
+        {
+            return $this->content;
+        }
+    };
+    $this->app->instance(ImapConnectionService::class, $imap);
+
+    $this->actingAs($otherUser)
+        ->get(route('emails.attachments.download', ['emailId' => $email->id, 'index' => 0]))
+        ->assertNotFound();
+    expect($imap->connectAttempts)->toBe([]);
+
+    $this->actingAs($owner)
+        ->get(route('emails.attachments.download', ['emailId' => $email->id, 'index' => 2]))
+        ->assertNotFound();
+    expect($imap->connectAttempts)->toBe([]);
+
+    $this->get(route('emails.show', ['emailId' => $email->id]))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->where('email.attachments.0.previewUrl', null)
+            ->where('email.attachments.0.downloadUrl', route('emails.attachments.download', ['emailId' => $email->id, 'index' => 0])));
+
+    $this->get(route('emails.attachments.preview', ['emailId' => $email->id, 'index' => 0]))
+        ->assertUnsupportedMediaType();
+
+    $imap->content = null;
+    $this->get(route('emails.attachments.download', ['emailId' => $email->id, 'index' => 0]))
+        ->assertNotFound();
+
+    $imap->uidValidity = 2;
+    $this->get(route('emails.attachments.download', ['emailId' => $email->id, 'index' => 0]))
+        ->assertConflict();
+
+    expect($imap->disconnectCounts[$owner->email] ?? null)->toBe(3);
 });
 
 test('authenticated users can access the mail settings and search pages', function () {
@@ -82,6 +196,45 @@ test('authenticated users can access the mail settings and search pages', functi
             ->has('emails.data')
             ->has('folders')
             ->where('selectedEmail', null));
+});
+
+test('email images include remote sources and resolve matching inline content from IMAP', function () {
+    $user = User::factory()->create();
+    $email = createRoutedEmail($user, [
+        'body_html' => '<p><img src="https://images.example.test/banner.png"><img src="cid:logo%40example.test"></p>',
+    ]);
+    $imap = new class extends ScriptedImapConnectionService
+    {
+        public array $requestedContentIds = [];
+
+        public function getInlineImages(ImapConnection $connection, string $folder, int $uid, array $contentIds): array
+        {
+            $this->requestedContentIds = $contentIds;
+
+            return ['logo@example.test' => ['mimeType' => 'image/png', 'content' => 'image bytes']];
+        }
+    };
+    $this->app->instance(ImapConnectionService::class, $imap);
+
+    $response = $this->actingAs($user)
+        ->get(route('emails.show', ['emailId' => $email->id]))
+        ->assertOk();
+
+    expect($imap->connectAttempts)->toBe([$user->email])
+        ->and($imap->requestedContentIds)->toBe(['logo@example.test']);
+
+    $response->assertInertia(fn ($page) => $page
+        ->component('Email')
+        ->where('email.document', function (string $document): bool {
+            expect($document)->toContain('img-src data: https: http:')
+                ->toContain('src="https://images.example.test/banner.png"')
+                ->toContain('src="data:image/png;base64,'.base64_encode('image bytes').'"');
+
+            return true;
+        }));
+
+    expect($imap->requestedContentIds)->toBe(['logo@example.test'])
+        ->and($imap->disconnectCounts[$user->email] ?? null)->toBe(1);
 });
 
 test('the mailbox lists folders with counts, attachment counts, and paging details', function () {

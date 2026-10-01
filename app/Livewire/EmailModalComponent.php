@@ -35,10 +35,7 @@ class EmailModalComponent extends Component
             ->whereBelongsTo(Auth::user())
             ->findOrFail($emailId);
 
-        $this->iframeDocument = app(EmailHtmlDocumentService::class)->build(
-            $this->email->body_html,
-            $this->email->body_text,
-        );
+        $this->iframeDocument = app(EmailHtmlDocumentService::class)->buildForEmail($this->email);
         $this->show = true;
     }
 

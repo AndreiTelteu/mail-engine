@@ -100,6 +100,11 @@ class ScriptedImapConnectionService implements ImapConnectionService
         return null;
     }
 
+    public function getInlineImages(ImapConnection $connection, string $folder, int $uid, array $contentIds): array
+    {
+        return [];
+    }
+
     public function recordDisconnect(string $username): void
     {
         $this->disconnectCounts[$username] = ($this->disconnectCounts[$username] ?? 0) + 1;

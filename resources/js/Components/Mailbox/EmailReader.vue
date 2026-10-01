@@ -67,7 +67,7 @@ const recipients = computed(() =>
         </header>
 
         <div class="flex min-h-0 flex-1 flex-col">
-            <!-- Server-generated HTML blocks active content, remote images, and forces links into new tabs. -->
+            <!-- Server-generated HTML blocks active content and forces links into new tabs. -->
             <iframe
                 class="w-full flex-1 bg-white"
                 :class="variant === 'page' ? 'min-h-[38rem]' : 'min-h-0'"
@@ -77,7 +77,7 @@ const recipients = computed(() =>
                 :title="`Message content: ${email.subject}`"
             />
 
-            <div v-if="email.attachments.length" class="shrink-0 border-t border-line bg-surface px-4 py-3">
+            <div v-if="email.attachments.length" class="max-h-[min(40dvh,20rem)] shrink-0 overflow-y-auto border-t border-line bg-surface px-4 py-3">
                 <AttachmentList :attachments="email.attachments" />
             </div>
         </div>
