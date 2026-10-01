@@ -5,7 +5,6 @@ use App\Models\ImapSetting;
 use App\Models\User;
 use App\Services\WebklexImapConnectionService;
 use Carbon\CarbonImmutable;
-use Mockery;
 use Webklex\PHPIMAP\Client;
 use Webklex\PHPIMAP\ClientManager;
 use Webklex\PHPIMAP\Exceptions\AuthFailedException;
@@ -39,7 +38,7 @@ test('imap integration connects to a mock server and retrieves folders and email
             ->map(fn (string $folder): object => (object) ['path' => $folder, 'name' => $folder])
             ->all(),
     ));
-    $client->shouldReceive('getFolder')->with('INBOX')->twice()->andReturn(integrationImapFolder(integrationImapFolders()['INBOX']));
+    $client->shouldReceive('getFolderByPath')->with('INBOX', true)->twice()->andReturn(integrationImapFolder(integrationImapFolders()['INBOX']));
 
     $manager = Mockery::mock(ClientManager::class);
     $manager->shouldReceive('make')->once()->andReturn($client);
@@ -48,13 +47,13 @@ test('imap integration connects to a mock server and retrieves folders and email
     $connection = $service->connect($setting);
 
     $folders = $service->getFolders($connection);
-    $messageIds = $service->getMessageIds($connection, 'INBOX');
+    $emails = $service->getEmailsAfterUid($connection, 'INBOX', 0, 100);
     $email = $service->getEmail($connection, '<invoice@example.com>');
 
     $connection->disconnect();
 
     expect($folders)->toBe(['INBOX', 'Sent'])
-        ->and($messageIds)->toBe(['<invoice@example.com>'])
+        ->and(collect($emails)->pluck('messageId')->all())->toBe(['<invoice@example.com>'])
         ->and($email->subject)->toBe('ideaprint.ro – 8 curieri, fără abonament')
         ->and($email->fromAddress)->toBe('billing@example.com')
         ->and($email->toAddresses)->toBe([['address' => 'integration@example.com', 'name' => 'Integration User']])
@@ -84,6 +83,11 @@ function integrationImapFolders(): array
                 public function getMessageId(): string
                 {
                     return '<invoice@example.com>';
+                }
+
+                public function getUid(): int
+                {
+                    return 1;
                 }
 
                 public function getFrom(): array
@@ -159,6 +163,8 @@ function integrationImapFolder(array $messages): object
     });
     $query->shouldReceive('setFetchBody')->andReturnSelf();
     $query->shouldReceive('setFetchFlags')->andReturnSelf();
+    $query->shouldReceive('limit')->with(100)->andReturnSelf();
+    $query->shouldReceive('getByUidGreater')->with(0)->andReturnUsing(fn () => new MessageCollection($messages));
     $query->shouldReceive('get')->andReturnUsing(fn () => new MessageCollection($messages));
     $folder->shouldReceive('messages')->andReturn($query);
 

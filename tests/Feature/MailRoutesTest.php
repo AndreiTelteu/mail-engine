@@ -128,6 +128,38 @@ test('the mailbox lists folders with counts, attachment counts, and paging detai
         ->assertInertia(fn ($page) => $page->where('emails.currentPage', 2));
 });
 
+test('the mailbox attachment filter keeps only matching emails and reports its state', function () {
+    config(['inertia.testing.ensure_pages_exist' => false]);
+
+    $user = User::factory()->create();
+    $matching = createRoutedEmail($user, [
+        'subject' => 'Invoice with attachment',
+        'attachments' => [['filename' => 'invoice.pdf', 'filetype' => 'application/pdf']],
+        'attachment_count' => 1,
+    ]);
+    createRoutedEmail($user, ['subject' => 'Invoice without attachment']);
+    createRoutedEmail(User::factory()->create(), [
+        'subject' => 'Another private invoice',
+        'attachments' => [['filename' => 'private.pdf', 'filetype' => 'application/pdf']],
+        'attachment_count' => 1,
+    ]);
+
+    $this->actingAs($user)
+        ->get(route('emails.index', ['has_attachments' => 1]))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->where('filters.hasAttachments', true)
+            ->where('emails.total', 1)
+            ->where('emails.data.0.id', $matching->id));
+
+    $this->actingAs($user)
+        ->get(route('emails.index'))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->where('filters.hasAttachments', false)
+            ->where('emails.total', 2));
+});
+
 test('authenticated users can select one of their emails in the mailbox workspace', function () {
     $user = User::factory()->create();
     $email = createRoutedEmail($user);

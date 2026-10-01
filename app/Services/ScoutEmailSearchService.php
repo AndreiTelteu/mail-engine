@@ -17,12 +17,12 @@ class ScoutEmailSearchService implements EmailSearchService
         protected ?Closure $searchExecutor = null,
     ) {}
 
-    public function search(User $user, string $query, ?string $folder = null, int $perPage = 20): LengthAwarePaginator
+    public function search(User $user, string $query, ?string $folder = null, int $perPage = 20, bool $hasAttachments = false): LengthAwarePaginator
     {
         $query = trim($query);
 
         if ($query === '') {
-            return $this->recent($user, $folder, $perPage);
+            return $this->recent($user, $folder, $perPage, $hasAttachments);
         }
 
         try {
@@ -33,6 +33,10 @@ class ScoutEmailSearchService implements EmailSearchService
 
             if ($folder !== null) {
                 $builder->where('folder', $folder);
+            }
+
+            if ($hasAttachments) {
+                $builder->where('attachment_count', '>', 0);
             }
 
             /** @var array{found?: int, hits?: array<int, array<string, mixed>>} $results */
@@ -63,24 +67,25 @@ class ScoutEmailSearchService implements EmailSearchService
         }
     }
 
-    public function getRecent(User $user, int $perPage = 20): LengthAwarePaginator
+    public function getRecent(User $user, int $perPage = 20, bool $hasAttachments = false): LengthAwarePaginator
     {
-        return $this->recent($user, null, $perPage);
+        return $this->recent($user, null, $perPage, $hasAttachments);
     }
 
-    private function recent(User $user, ?string $folder, int $perPage): LengthAwarePaginator
+    private function recent(User $user, ?string $folder, int $perPage, bool $hasAttachments): LengthAwarePaginator
     {
-        return $this->recentQuery($user, $folder)
+        return $this->recentQuery($user, $folder, $hasAttachments)
             ->paginate($perPage)
             ->through(fn (Email $email): EmailSearchResult => EmailSearchResult::fromEmail($email));
     }
 
-    protected function recentQuery(User $user, ?string $folder = null)
+    protected function recentQuery(User $user, ?string $folder = null, bool $hasAttachments = false)
     {
         return Email::query()
             ->select($this->resultColumns())
             ->whereBelongsTo($user)
             ->when($folder !== null, fn ($emailQuery) => $emailQuery->where('folder', $folder))
+            ->when($hasAttachments, fn ($emailQuery) => $emailQuery->where('attachment_count', '>', 0))
             ->orderByDesc('date');
     }
 

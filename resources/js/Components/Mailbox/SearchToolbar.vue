@@ -6,17 +6,18 @@ import Spinner from '../Spinner.vue';
 const props = defineProps({
     modelValue: { type: String, default: '' },
     folder: { type: String, default: '' },
+    hasAttachments: { type: Boolean, default: false },
     total: { type: Number, default: 0 },
     from: { type: Number, default: null },
     to: { type: Number, default: null },
     searching: { type: Boolean, default: false },
 });
 
-const emit = defineEmits(['update:modelValue', 'clear-folder', 'clear-query']);
+const emit = defineEmits(['update:modelValue', 'update:hasAttachments', 'clear-folder', 'clear-query']);
 
 const summary = computed(() => {
     if (props.total === 0) {
-        return props.modelValue || props.folder ? 'No matching messages' : 'No messages indexed';
+        return props.modelValue || props.folder || props.hasAttachments ? 'No matching messages' : 'No messages indexed';
     }
 
     const range = props.from && props.to && props.total > props.to ? `${props.from}\u2013${props.to} of ` : '';
@@ -60,10 +61,25 @@ const summary = computed(() => {
             </span>
         </div>
 
-        <div class="flex min-h-5 items-center gap-2">
+        <div class="flex min-h-5 flex-wrap items-center gap-2">
             <p class="tabular min-w-0 flex-1 truncate text-sm text-ink-subtle" aria-live="polite">
                 {{ summary }}
             </p>
+            <label
+                class="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-md border px-2 py-1 text-sm transition-colors duration-100 focus-within:ring-2 focus-within:ring-accent-solid"
+                :class="hasAttachments
+                    ? 'border-accent-line bg-accent-soft text-ink'
+                    : 'border-line-strong text-ink-muted hover:bg-hover hover:text-ink'"
+            >
+                <input
+                    type="checkbox"
+                    class="size-4 accent-accent-solid"
+                    :checked="hasAttachments"
+                    @change="emit('update:hasAttachments', $event.target.checked)"
+                />
+                <AppIcon name="paperclip" :size="14" />
+                <span>Attachments only</span>
+            </label>
             <button
                 v-if="folder"
                 type="button"

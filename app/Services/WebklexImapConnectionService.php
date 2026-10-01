@@ -14,6 +14,7 @@ use Throwable;
 use Webklex\PHPIMAP\ClientManager;
 use Webklex\PHPIMAP\Exceptions\AuthFailedException;
 use Webklex\PHPIMAP\Exceptions\ConnectionFailedException;
+use Webklex\PHPIMAP\Message;
 
 class WebklexImapConnectionService implements ImapConnectionService
 {
@@ -144,6 +145,24 @@ class WebklexImapConnectionService implements ImapConnectionService
         throw new ImapConnectionException("Email with message ID [{$messageId}] was not found.");
     }
 
+    public function getAttachment(ImapConnection $connection, string $folder, int $uid, int $index): ?string
+    {
+        try {
+            $message = $this->queryFolder($connection, $folder)
+                ->whereUid($uid)
+                ->setFetchBody(true)
+                ->setFetchFlags(false)
+                ->get()
+                ->first();
+
+            $attachment = $message?->getAttachments()->values()->get($index);
+
+            return $attachment?->getContent();
+        } catch (Throwable $exception) {
+            throw $this->mapException($exception);
+        }
+    }
+
     protected function emailData(object $message, ?string $fallbackMessageId = null): EmailData
     {
         return new EmailData(
@@ -153,7 +172,7 @@ class WebklexImapConnectionService implements ImapConnectionService
             toAddresses: $this->normalizeAddresses($message->getTo()),
             ccAddresses: $this->normalizeAddresses($message->getCc()),
             subject: $this->decodeMimeHeader($this->stringValue($message->getSubject())) ?? '',
-            date: $this->normalizeDate($message->getDate()),
+            date: $this->messageDate($message),
             bodyText: $this->nullableString($message->getTextBody()),
             bodyHtml: $this->nullableString($message->getHTMLBody()),
             attachments: $this->normalizeAttachments($message->getAttachments()),
@@ -198,7 +217,7 @@ class WebklexImapConnectionService implements ImapConnectionService
 
     protected function queryFolder(ImapConnection $connection, string $folder): object
     {
-        $folderInstance = $this->client($connection)->getFolder($folder);
+        $folderInstance = $this->client($connection)->getFolderByPath($folder, true);
 
         if ($folderInstance === null) {
             throw new ImapConnectionException("Folder [{$folder}] was not found.");
@@ -330,6 +349,33 @@ class WebklexImapConnectionService implements ImapConnectionService
             ->all();
     }
 
+    /**
+     * Replace the parser's fallback date with the server's message timestamp.
+     * Read the quoted response because the library splits INTERNALDATE at spaces.
+     */
+    protected function messageDate(object $message): DateTimeInterface
+    {
+        $date = $this->normalizeDate($message->getDate());
+
+        if ($date->getTimestamp() !== 0 || ! $message instanceof Message) {
+            return $date;
+        }
+
+        $uid = (int) $message->getUid();
+        $response = $message->getClient()?->getConnection()
+            ->fetch('INTERNALDATE', [$uid])
+            ->validate();
+
+        foreach ($response?->getResponse() ?? [] as $line) {
+            if (preg_match('/\bUID\s+'.$uid.'\b/i', $line)
+                && preg_match('/\bINTERNALDATE\s+"([^"]+)"/i', $line, $matches)) {
+                return $this->normalizeDate($matches[1]);
+            }
+        }
+
+        throw new ImapConnectionException("The server did not return a message date for UID [{$uid}].");
+    }
+
     protected function normalizeDate(mixed $date): DateTimeInterface
     {
         if ($date instanceof DateTimeInterface) {
@@ -397,7 +443,7 @@ class WebklexImapConnectionService implements ImapConnectionService
         }
 
         return is_scalar($value) || (is_object($value) && method_exists($value, '__toString'))
-            ? trim((string) $value)
+            ? trim(mb_scrub((string) $value, 'UTF-8'))
             : null;
     }
 

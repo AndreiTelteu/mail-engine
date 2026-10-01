@@ -28,6 +28,7 @@ export function useMailboxWorkspace(props) {
             {
                 query: query.value || undefined,
                 folder: props.filters.folder || undefined,
+                has_attachments: props.filters.hasAttachments ? 1 : undefined,
                 email: props.filters.email || undefined,
                 page: props.emails.currentPage > 1 ? props.emails.currentPage : undefined,
                 ...overrides,
@@ -55,6 +56,7 @@ export function useMailboxWorkspace(props) {
     });
 
     const selectFolder = (folder) => visit({ folder: folder || undefined, page: undefined });
+    const setHasAttachments = (enabled) => visit({ has_attachments: enabled ? 1 : undefined, page: undefined });
     const selectEmail = (id) => visit({ email: id }, ['filters', 'selectedEmail']);
     const emailHref = (id) => {
         const parameters = new URLSearchParams();
@@ -65,6 +67,10 @@ export function useMailboxWorkspace(props) {
 
         if (props.filters.folder) {
             parameters.set('folder', props.filters.folder);
+        }
+
+        if (props.filters.hasAttachments) {
+            parameters.set('has_attachments', '1');
         }
 
         parameters.set('email', id);
@@ -82,7 +88,7 @@ export function useMailboxWorkspace(props) {
         clearTimeout(debounceTimer);
         suppressNextSearch = true;
         query.value = '';
-        visit({ query: undefined, folder: undefined, page: undefined });
+        visit({ query: undefined, folder: undefined, has_attachments: undefined, page: undefined });
     };
 
     const clearQuery = () => {
@@ -159,8 +165,9 @@ export function useMailboxWorkspace(props) {
         query,
         searching,
         searchField,
-        isFiltered: computed(() => Boolean(props.filters.query || props.filters.folder)),
+        isFiltered: computed(() => Boolean(props.filters.query || props.filters.folder || props.filters.hasAttachments)),
         selectFolder,
+        setHasAttachments,
         emailHref,
         closeEmail,
         goToPage,

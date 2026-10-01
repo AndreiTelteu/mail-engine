@@ -5,10 +5,12 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="color-scheme" content="dark light">
         <meta name="application-name" content="{{ config('app.name', 'Mail Engine') }}">
+        <meta name="theme-color" content="#101216">
 
         <link rel="icon" href="/favicon.ico" sizes="any">
         <link rel="icon" href="/favicon.svg" type="image/svg+xml">
         <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+        <link rel="manifest" href="/manifest.json">
 
         @include('partials.theme')
         @vite(['resources/css/app.css', 'resources/js/app.js'])

@@ -8,6 +8,10 @@ use App\Services\ImapConnectionService;
 use Illuminate\Support\Facades\Queue;
 use Tests\Support\Fakes\ScriptedImapConnectionService;
 
+beforeEach(function () {
+    config(['inertia.testing.ensure_pages_exist' => false]);
+});
+
 function fakeImap(?callable $handler = null): ScriptedImapConnectionService
 {
     $service = new ScriptedImapConnectionService(testConnectionHandler: $handler ?? fn (): bool => true);

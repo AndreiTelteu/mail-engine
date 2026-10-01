@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[Fillable([
     'sync_session_id',
+    'email_id',
     'to_address',
     'subject',
     'status',

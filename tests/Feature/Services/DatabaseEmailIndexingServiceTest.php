@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Services\DatabaseEmailIndexingService;
 use App\Services\EmailContentProcessor;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\Schema;
 
 test('batch indexing stores a searchable representation without losing the original message body', function () {
     config(['scout.driver' => null]);
@@ -83,6 +84,47 @@ test('batch indexing is idempotent by mailbox folder UIDVALIDITY and UID, not Me
 
     expect(Email::query()->count())->toBe(1)
         ->and(Email::query()->sole()->subject)->toBe('Updated version');
+});
+
+test('batch indexing preserves long message identifiers and reply headers without blocking other messages', function () {
+    config(['scout.driver' => null]);
+    [$user, $folder] = mailFolderForIndexing();
+    $service = new DatabaseEmailIndexingService(new EmailContentProcessor);
+    $messageId = '<'.str_repeat('message', 200).'@example.com>';
+    $inReplyTo = '<'.str_repeat('parent', 200).'@example.com>';
+    $emails = collect([1, 2])->map(fn (int $uid): EmailData => new EmailData(
+        messageId: $uid === 1 ? $messageId : '<normal@example.com>',
+        fromAddress: 'sender@example.com',
+        fromName: null,
+        toAddresses: [],
+        ccAddresses: [],
+        subject: "Message {$uid}",
+        date: now(),
+        bodyText: 'Body',
+        bodyHtml: null,
+        attachments: [],
+        imapUid: $uid,
+        inReplyTo: $inReplyTo,
+    ))->all();
+
+    expect(Schema::getColumnType('emails', 'message_id'))->toBe('text')
+        ->and(Schema::getColumnType('emails', 'in_reply_to'))->toBe('text')
+        ->and(Schema::hasIndex('emails', ['user_id', 'message_id']))->toBeTrue();
+
+    $indexed = $service->indexEmails($user, $folder, $emails);
+    $service->indexEmails($user, $folder, $emails);
+
+    expect($indexed)->toHaveCount(2)
+        ->and(Email::query()->count())->toBe(2)
+        ->and(Email::query()->where('imap_uid', 1)->sole()->message_id)->toBe($messageId)
+        ->and(Email::query()->where('imap_uid', 1)->sole()->in_reply_to)->toBe($inReplyTo);
+
+    $migration = require database_path('migrations/2026_10_01_102138_widen_email_message_id_headers.php');
+
+    expect(fn () => $migration->down())->toThrow(RuntimeException::class, 'Cannot narrow email message headers')
+        ->and(Schema::getColumnType('emails', 'message_id'))->toBe('text')
+        ->and(Schema::hasIndex('emails', ['user_id', 'message_id']))->toBeTrue()
+        ->and(Email::query()->where('imap_uid', 1)->sole()->message_id)->toBe($messageId);
 });
 
 test('the content processor extracts readable text from html and removes invisible markup', function () {

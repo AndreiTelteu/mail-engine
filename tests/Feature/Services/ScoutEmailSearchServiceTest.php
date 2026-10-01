@@ -66,6 +66,21 @@ test('search fails explicitly when Typesense is unavailable', function () {
         ->toThrow(ServiceUnavailableHttpException::class, 'Typesense is unavailable');
 });
 
+test('search adds the attachment filter to the Typesense query', function () {
+    $user = User::factory()->create();
+    $service = new ScoutEmailSearchService(function (ScoutBuilder $builder): array {
+        expect($builder->wheres)->toContain([
+            'field' => 'attachment_count',
+            'operator' => '>',
+            'value' => 0,
+        ]);
+
+        return ['found' => 0, 'hits' => []];
+    });
+
+    expect($service->search($user, 'invoice', hasAttachments: true)->total())->toBe(0);
+});
+
 test('recent messages use the compact projection without loading email bodies', function () {
     config(['scout.driver' => null]);
     $user = User::factory()->create();
@@ -107,4 +122,47 @@ test('recent messages use the compact projection without loading email bodies', 
     expect($result)->toBeInstanceOf(EmailSearchResult::class)
         ->and($result->id)->toBe($email->id)
         ->and($result->preview)->toBe('A compact preview');
+});
+
+test('recent messages can be limited to those with attachments', function () {
+    config(['scout.driver' => null]);
+    $user = User::factory()->create();
+    $setting = ImapSetting::create([
+        'user_id' => $user->id,
+        'hostname' => 'imap.example.com',
+        'port' => 993,
+        'username' => $user->email,
+        'password' => 'secret',
+        'encryption' => 'ssl',
+        'is_active' => true,
+    ]);
+    $folder = MailFolder::create([
+        'imap_setting_id' => $setting->id,
+        'path' => 'INBOX',
+        'uid_validity' => 1,
+    ]);
+
+    foreach ([0, 1] as $attachmentCount) {
+        Email::withoutSyncingToSearch(fn () => Email::create([
+            'mail_folder_id' => $folder->id,
+            'user_id' => $user->id,
+            'uid_validity' => 1,
+            'imap_uid' => $attachmentCount + 1,
+            'folder' => 'INBOX',
+            'from_address' => 'sender@example.com',
+            'to_addresses' => [],
+            'cc_addresses' => [],
+            'subject' => 'Invoice',
+            'date' => now(),
+            'preview' => 'Invoice',
+            'attachments' => $attachmentCount ? [['filename' => 'invoice.pdf', 'filetype' => 'application/pdf']] : [],
+            'attachment_count' => $attachmentCount,
+            'content_hash' => hash('sha256', (string) $attachmentCount),
+        ]));
+    }
+
+    $results = (new ScoutEmailSearchService)->getRecent($user, hasAttachments: true);
+
+    expect($results->total())->toBe(1)
+        ->and($results->items()[0]->attachmentCount)->toBe(1);
 });

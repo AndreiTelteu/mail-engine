@@ -4,10 +4,13 @@ import AppLayout from '../Layouts/AppLayout.vue';
 import ImapSettingsForm from '../Components/Settings/ImapSettingsForm.vue';
 import PageHeader from '../Components/PageHeader.vue';
 import SyncPanel from '../Components/Settings/SyncPanel.vue';
+import McpTokensPanel from '../Components/Settings/McpTokensPanel.vue';
 
 defineProps({
     setting: { type: Object, default: null },
     syncSession: { type: Object, default: null },
+    mcpTokens: { type: Array, default: () => [] },
+    createdMcpTokenId: { type: Number, default: null },
 });
 </script>
 
@@ -28,6 +31,8 @@ defineProps({
                 </section>
 
                 <SyncPanel :session="syncSession" :configured="Boolean(setting)" />
+
+                <McpTokensPanel :tokens="mcpTokens" :created-token-id="createdMcpTokenId" class="lg:col-span-2" />
             </div>
         </div>
     </AppLayout>

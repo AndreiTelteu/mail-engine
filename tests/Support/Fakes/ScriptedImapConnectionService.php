@@ -95,6 +95,11 @@ class ScriptedImapConnectionService implements ImapConnectionService
         throw new ImapConnectionException("Email with message ID [{$messageId}] was not found.");
     }
 
+    public function getAttachment(ImapConnection $connection, string $folder, int $uid, int $index): ?string
+    {
+        return null;
+    }
+
     public function recordDisconnect(string $username): void
     {
         $this->disconnectCounts[$username] = ($this->disconnectCounts[$username] ?? 0) + 1;

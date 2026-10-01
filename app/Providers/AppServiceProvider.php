@@ -23,7 +23,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        $this->app->singleton(ClientManager::class, fn (): ClientManager => new ClientManager([]));
+        $this->app->singleton(ClientManager::class, fn (): ClientManager => new ClientManager([
+            'options' => ['fallback_date' => '1970-01-01 00:00:00 UTC'],
+        ]));
         $this->app->singleton(TypesenseClient::class, fn (): TypesenseClient => new TypesenseClient(config('scout.typesense.client-settings', [])));
         $this->app->singleton(ImapConnectionService::class, WebklexImapConnectionService::class);
         $this->app->singleton(EmailIndexingService::class, DatabaseEmailIndexingService::class);

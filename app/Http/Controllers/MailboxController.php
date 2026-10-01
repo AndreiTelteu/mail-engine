@@ -23,6 +23,7 @@ class MailboxController extends Controller
         $validated = $request->validate([
             'query' => ['nullable', 'string', 'max:250'],
             'folder' => ['nullable', 'string', 'max:255'],
+            'has_attachments' => ['nullable', 'boolean'],
             'email' => ['nullable', 'integer'],
             'page' => ['nullable', 'integer', 'min:1'],
         ]);
@@ -31,6 +32,7 @@ class MailboxController extends Controller
         $user = $request->user();
         $query = $validated['query'] ?? '';
         $folder = $validated['folder'] ?? null;
+        $hasAttachments = (bool) ($validated['has_attachments'] ?? false);
         $selectedEmailId = isset($validated['email'])
             ? (int) $validated['email']
             : null;
@@ -45,6 +47,7 @@ class MailboxController extends Controller
             'filters' => [
                 'query' => $query,
                 'folder' => $folder,
+                'hasAttachments' => $hasAttachments,
                 'email' => $selectedEmailId,
             ],
             'selectedEmail' => function () use ($emailHtmlDocumentService, $selectedEmailId, $user): ?array {
@@ -58,10 +61,10 @@ class MailboxController extends Controller
                     ? $this->emailDetail($selectedEmail, $emailHtmlDocumentService)
                     : null;
             },
-            'emails' => function () use ($folder, $query, $searchService, $user): array {
+            'emails' => function () use ($folder, $hasAttachments, $query, $searchService, $user): array {
                 $results = blank($query) && $folder === null
-                    ? $searchService->getRecent($user)
-                    : $searchService->search($user, $query, $folder);
+                    ? $searchService->getRecent($user, hasAttachments: $hasAttachments)
+                    : $searchService->search($user, $query, $folder, hasAttachments: $hasAttachments);
 
                 return [
                     'data' => collect($results->items())

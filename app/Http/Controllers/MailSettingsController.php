@@ -6,6 +6,7 @@ use App\Exceptions\Imap\ImapConnectionException;
 use App\Http\Requests\StoreImapSettingsRequest;
 use App\Jobs\SyncUserEmailsJob;
 use App\Models\ImapSetting;
+use App\Models\McpAccessToken;
 use App\Models\SyncSession;
 use App\Models\SyncSessionLog;
 use App\Models\User;
@@ -32,6 +33,16 @@ class MailSettingsController extends Controller
                 'isActive' => $setting->is_active,
             ] : null,
             'syncSession' => $this->syncSession($user),
+            'mcpTokens' => $user->mcpAccessTokens()
+                ->latest()
+                ->get()
+                ->map(fn (McpAccessToken $token): array => [
+                    'id' => $token->id,
+                    'url' => route('mcp.mail', ['token' => $token->token_encrypted]),
+                    'createdAt' => $token->created_at->toIso8601String(),
+                    'lastUsedAt' => $token->last_used_at?->toIso8601String(),
+                ]),
+            'createdMcpTokenId' => request()->session()->get('created_mcp_token_id'),
         ]);
     }
 

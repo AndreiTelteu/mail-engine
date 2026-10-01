@@ -27,6 +27,7 @@ const {
     searchField,
     isFiltered,
     selectFolder,
+    setHasAttachments,
     emailHref,
     closeEmail,
     goToPage,
@@ -59,11 +60,13 @@ const {
                     <SearchToolbar
                         v-model="query"
                         :folder="filters.folder ?? ''"
+                        :has-attachments="filters.hasAttachments === true"
                         :total="emails.total"
                         :from="emails.from"
                         :to="emails.to"
                         :searching="searching"
                         @clear-folder="selectFolder('')"
+                        @update:has-attachments="setHasAttachments"
                         @clear-query="clearQuery"
                     />
                 </div>

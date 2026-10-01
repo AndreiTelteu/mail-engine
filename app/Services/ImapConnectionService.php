@@ -37,4 +37,6 @@ interface ImapConnectionService
     ): array;
 
     public function getEmail(ImapConnection $connection, string $messageId): EmailData;
+
+    public function getAttachment(ImapConnection $connection, string $folder, int $uid, int $index): ?string;
 }

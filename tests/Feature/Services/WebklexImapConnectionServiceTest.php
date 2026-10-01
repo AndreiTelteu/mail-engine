@@ -10,8 +10,16 @@ use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 use Webklex\PHPIMAP\Client;
 use Webklex\PHPIMAP\ClientManager;
+use Webklex\PHPIMAP\Config;
+use Webklex\PHPIMAP\Connection\Protocols\ImapProtocol;
+use Webklex\PHPIMAP\Connection\Protocols\Response;
 use Webklex\PHPIMAP\Exceptions\AuthFailedException;
 use Webklex\PHPIMAP\Exceptions\ConnectionFailedException;
+use Webklex\PHPIMAP\Folder;
+use Webklex\PHPIMAP\Message;
+use Webklex\PHPIMAP\Query\WhereQuery;
+use Webklex\PHPIMAP\Support\FolderCollection;
+use Webklex\PHPIMAP\Support\MessageCollection;
 
 test('test connection succeeds with valid credentials', function () {
     $client = Mockery::mock(Client::class);
@@ -129,6 +137,33 @@ test('get folder status and incremental messages use IMAP UIDs', function () {
         ->and($status->messageCount)->toBe(2)
         ->and(collect($emails)->pluck('imapUid')->all())->toBe([2]);
 });
+
+test('incremental messages resolve the exact server folder path', function (string $path, string $delimiter) {
+    $message = imapMessageWithUid('<target@example.com>', 2);
+    $client = Mockery::mock(Client::class.'[getFolders]', [Config::make()]);
+    $folder = Mockery::mock(Folder::class.'[messages]', [$client, $path, $delimiter, []]);
+    $client->shouldReceive('getFolders')->once()->andReturn(new FolderCollection([$folder]));
+
+    $query = Mockery::mock(WhereQuery::class);
+    $query->shouldReceive('setFetchBody')->with(true)->once()->andReturnSelf();
+    $query->shouldReceive('setFetchFlags')->with(false)->once()->andReturnSelf();
+    $query->shouldReceive('limit')->with(100)->once()->andReturnSelf();
+    $query->shouldReceive('getByUidGreater')->with(1)->once()->andReturn(new MessageCollection([$message]));
+    $folder->shouldReceive('messages')->once()->andReturn($query);
+
+    $connection = makeImapConnectionWithResource($client);
+    $service = new WebklexImapConnectionService(Mockery::mock(ClientManager::class));
+    $emails = $service->getEmailsAfterUid($connection, $path, 1, 100);
+
+    expect($emails)->toHaveCount(1)
+        ->and($emails[0]->messageId)->toBe('<target@example.com>')
+        ->and($emails[0]->imapUid)->toBe(2);
+})->with([
+    'inbox' => ['INBOX', '/'],
+    'dot separator' => ['INBOX.Trash', '.'],
+    'slash separator' => ['INBOX/Trash', '/'],
+    'encoded server path' => ['INBOX/R&AOk-sum&AOk-', '/'],
+]);
 
 test('get email builds an email dto from the first matching message across folders', function () {
     $message = new class
@@ -278,6 +313,74 @@ test('get email decodes mime encoded headers', function () {
         ->and($email->attachments)->toBe([['filename' => 'invoică.pdf', 'filetype' => 'application/pdf']]);
 });
 
+test('incremental messages replace malformed UTF-8 without changing valid body characters', function (string $body) {
+    $message = imapMessageWithUid('<malformed@example.com>', 1, $body, '<p>'.$body.'</p>');
+    $connection = makeImapConnectionWithResource(fakeClientWithFolders(['INBOX' => [$message]]));
+    $service = new WebklexImapConnectionService(Mockery::mock(ClientManager::class));
+
+    $email = $service->getEmailsAfterUid($connection, 'INBOX', 0, 10)[0];
+
+    expect(mb_check_encoding($email->bodyText, 'UTF-8'))->toBeTrue()
+        ->and(mb_check_encoding($email->bodyHtml, 'UTF-8'))->toBeTrue()
+        ->and($email->bodyText)->toContain('Bună', 'Jan')
+        ->and(json_encode([$email->bodyText, $email->bodyHtml], JSON_THROW_ON_ERROR))->toBeString();
+})->with([
+    'invalid continuation byte' => ["Bună \x80\r\nJan"],
+    'truncated multibyte sequence' => ["Bună \xC3\r\nJan"],
+    'valid UTF-8' => ["Bună €\r\nJan"],
+]);
+
+test('malformed date headers use the server timestamp and do not block the batch', function (string $date, ?string $expectedDate, bool $fetchInternalDate) {
+    $config = app(ClientManager::class)->getConfig();
+    $protocol = Mockery::mock(ImapProtocol::class);
+
+    if ($fetchInternalDate) {
+        $response = Response::empty()->setResult([1 => '"25-Aug-2026'])->setResponse([
+            "* 2 FETCH (UID 2 INTERNALDATE \"01-Jul-2026 01:00:00 +0000\")\r\n",
+            "TAG1 OK Fetch completed\r\n",
+        ]);
+
+        if ($expectedDate !== null) {
+            $response->addResponse("* 1 FETCH (INTERNALDATE \"25-Aug-2026 04:07:45 +0000\" UID 1)\r\n");
+        }
+
+        $protocol->shouldReceive('fetch')->once()->with('INTERNALDATE', [1])
+            ->andReturn($response);
+    } else {
+        $protocol->shouldNotReceive('fetch');
+    }
+
+    $client = Mockery::mock(Client::class.'[openFolder,getFolderPath,getConnection]', [$config]);
+    $client->shouldReceive('openFolder')->andReturn([]);
+    $client->shouldReceive('getFolderPath')->andReturn('INBOX');
+    $client->shouldReceive('getConnection')->andReturn($protocol);
+
+    $message = Message::make(1, 1, $client, "Date: {$date}\r\nMessage-ID: <date@example.com>\r\nContent-Type: text/plain\r\n", 'Body', ['Seen']);
+    $connection = makeImapConnectionWithResource(fakeClientWithFolders([
+        'INBOX' => [$message, imapMessageWithUid('<next@example.com>', 2)],
+    ]));
+    $service = app(WebklexImapConnectionService::class);
+
+    if ($expectedDate === null) {
+        expect(fn () => $service->getEmailsAfterUid($connection, 'INBOX', 0, 25))
+            ->toThrow(ImapConnectionException::class, 'The server did not return a message date for UID [1].');
+
+        return;
+    }
+
+    $emails = $service->getEmailsAfterUid($connection, 'INBOX', 0, 25);
+
+    expect($emails)->toHaveCount(2)
+        ->and($emails[0]->date->format('Y-m-d H:i:s'))->toBe($expectedDate)
+        ->and($emails[0]->bodyText)->toBe('Body')
+        ->and($emails[1]->imapUid)->toBe(2);
+})->with([
+    'unparseable date' => ['not-a-date', '2026-08-25 04:07:45', true],
+    'date containing other headers' => ['Tue, 25 Aug 2026 04:07:45 +0000 From: sender@example.com Reply-To: sender@example.com', '2026-08-25 04:07:45', true],
+    'valid date' => ['Mon, 24 Aug 2026 10:00:00 +0000', '2026-08-24 10:00:00', false],
+    'missing server timestamp does not use another message date' => ['not-a-date', null, true],
+]);
+
 function makeImapConnectionWithResource(object $resource): ImapConnection
 {
     $user = User::factory()->create();
@@ -294,13 +397,15 @@ function makeImapConnectionWithResource(object $resource): ImapConnection
     return new ImapConnection($resource, $setting);
 }
 
-function imapMessageWithUid(string $messageId, int $uid): object
+function imapMessageWithUid(string $messageId, int $uid, string $bodyText = '', string $bodyHtml = ''): object
 {
-    return new class($messageId, $uid)
+    return new class($messageId, $uid, $bodyText, $bodyHtml)
     {
         public function __construct(
             private string $messageId,
             private int $uid,
+            private string $bodyText,
+            private string $bodyHtml,
         ) {}
 
         public function getMessageId(): string
@@ -340,12 +445,12 @@ function imapMessageWithUid(string $messageId, int $uid): object
 
         public function getTextBody(): string
         {
-            return '';
+            return $this->bodyText;
         }
 
         public function getHTMLBody(): string
         {
-            return '';
+            return $this->bodyHtml;
         }
 
         public function getAttachments(): array
@@ -375,7 +480,7 @@ function fakeClientWithFolders(array $folders): object
                 ->all();
         }
 
-        public function getFolder(string $folder): ?object
+        public function getFolderByPath(string $folder, bool $utf7 = false): ?object
         {
             if (! array_key_exists($folder, $this->folders)) {
                 return null;

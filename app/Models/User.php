@@ -55,4 +55,9 @@ class User extends Authenticatable
     {
         return $this->hasMany(Email::class);
     }
+
+    public function mcpAccessTokens(): HasMany
+    {
+        return $this->hasMany(McpAccessToken::class);
+    }
 }

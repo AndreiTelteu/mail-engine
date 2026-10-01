@@ -6,6 +6,7 @@ use App\Models\Email;
 use App\Models\ImapSetting;
 use App\Models\MailFolder;
 use App\Models\SyncSession;
+use App\Models\SyncSessionLog;
 use App\Models\User;
 use App\Services\EmailIndexingService;
 use App\Services\ImapConnectionService;
@@ -17,7 +18,9 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Throwable;
 
 class SyncFolderEmailsJob implements ShouldBeUnique, ShouldQueue
@@ -145,8 +148,48 @@ class SyncFolderEmailsJob implements ShouldBeUnique, ShouldQueue
                 break;
             }
 
-            $indexedEmails = $indexingService->indexEmails($user, $mailFolder, $emails);
-            $indexedEmails->searchableSync();
+            $indexedEmails = DB::transaction(function () use ($emails, $indexingService, $mailFolder, $user) {
+                $existingUids = $this->syncSessionId === null ? [] : Email::query()
+                    ->whereBelongsTo($mailFolder)
+                    ->where('uid_validity', $mailFolder->uid_validity)
+                    ->whereIn('imap_uid', collect($emails)->pluck('imapUid'))
+                    ->pluck('imap_uid')
+                    ->map(fn (int|string $uid): int => (int) $uid)
+                    ->all();
+
+                $indexedEmails = $indexingService->indexEmails($user, $mailFolder, $emails);
+
+                if ($this->syncSessionId !== null) {
+                    foreach ($indexedEmails as $email) {
+                        if (! $email->exists || in_array((int) $email->imap_uid, $existingUids, true)) {
+                            continue;
+                        }
+
+                        SyncSessionLog::create([
+                            'sync_session_id' => $this->syncSessionId,
+                            'email_id' => $email->id,
+                            'to_address' => (string) data_get($email->to_addresses, '0.address', ''),
+                            'subject' => Str::substr((string) $email->subject, 0, 500),
+                            'status' => 'success',
+                        ]);
+                    }
+                }
+
+                return $indexedEmails;
+            });
+
+            try {
+                $indexedEmails->searchableSync();
+            } catch (Throwable $exception) {
+                Log::warning('Search indexing failed; IMAP synchronization will continue.', [
+                    'user_id' => $user->id,
+                    'mail_folder_id' => $mailFolder->id,
+                    'sync_session_id' => $this->syncSessionId,
+                    'message_count' => $indexedEmails->count(),
+                    'error' => $exception->getMessage(),
+                ]);
+            }
+
             $lastSyncedUid = max(collect($emails)->pluck('imapUid')->all());
 
             $mailFolder->forceFill([

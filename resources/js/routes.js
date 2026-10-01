@@ -10,6 +10,8 @@ export const routes = {
     mailSettings: '/settings/mail',
     mailSettingsTest: '/settings/mail/test',
     mailSettingsSync: '/settings/mail/sync',
+    mcpTokens: '/settings/mail/mcp-tokens',
+    mcpToken: (id) => `/settings/mail/mcp-tokens/${id}`,
     login: '/login',
     register: '/register',
     logout: '/logout',
